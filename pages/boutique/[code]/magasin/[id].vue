@@ -289,17 +289,10 @@ async function loadMagasin() {
   error.value = ''
 
   try {
-    // Charger les infos de la boutique pour avoir le nom du magasin
-    const boutique = await $fetch(`/api/boutique/${code}`)
-    magasin.value = boutique.magasins?.find((m: Magasin) => m.id === magasinId) || null
-
-    if (!magasin.value) {
-      error.value = 'Magasin non trouvé'
-      return
-    }
-
-    // Charger les items
-    items.value = await $fetch(`/api/boutique/${code}/magasins/${magasinId}/items`)
+    // Charger les items et infos du magasin
+    const response = await $fetch<{ magasin: Magasin, items: Item[] }>(`/api/boutique/${code}/magasins/${magasinId}/items`)
+    magasin.value = response.magasin
+    items.value = response.items
   } catch (e: any) {
     error.value = e.data?.message || 'Erreur lors du chargement'
   } finally {
