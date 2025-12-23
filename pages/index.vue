@@ -1,6 +1,9 @@
 <template>
   <main class="min-h-screen p-4 bg-base-100">
     <header class="text-center mb-6">
+      <a href="https://cyriongames.fr" class="btn btn-ghost btn-sm mb-2">
+        <span class="mr-1">&#8592;</span> Portail
+      </a>
       <h1 class="text-3xl font-bold text-primary">Liste de courses</h1>
     </header>
 
