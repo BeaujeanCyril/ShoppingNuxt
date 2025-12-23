@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["shopping"]
+}
+
+// Catalogue des items (pas de doublons)
+model Item {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  shoppingListItems ShoppingListItem[]
+
+  @@schema("shopping")
+}
+
+// Liste de courses
+model ShoppingList {
+  id        Int      @id @default(autoincrement())
+  name      String   @default("Ma liste")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items ShoppingListItem[]
+
+  @@schema("shopping")
+}
+
+// Items dans une liste de courses
+model ShoppingListItem {
+  id             Int          @id @default(autoincrement())
+  quantity       Int          @default(1)
+  checked        Boolean      @default(false)
+  shoppingListId Int
+  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  itemId         Int
+  item           Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([shoppingListId, itemId])
+  @@schema("shopping")
+}
