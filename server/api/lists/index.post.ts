@@ -1,7 +1,7 @@
 import prisma from '~/server/utils/db'
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event)
+  const body = await readBody(event) || {}
   const { name } = body
 
   const list = await prisma.shoppingList.create({
