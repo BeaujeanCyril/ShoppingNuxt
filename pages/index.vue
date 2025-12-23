@@ -1,282 +1,211 @@
 <template>
   <main class="min-h-screen p-4 bg-base-100">
-    <header class="text-center mb-6">
-      <a href="https://cyriongames.fr" class="btn btn-ghost btn-sm mb-2">
-        <span class="mr-1">&#8592;</span> Portail
-      </a>
-      <h1 class="text-3xl font-bold text-primary">Liste de courses</h1>
-    </header>
+    <!-- Loading auth -->
+    <div v-if="isLoading" class="flex justify-center items-center min-h-screen">
+      <span class="loading loading-spinner loading-lg text-primary"></span>
+    </div>
 
-    <div class="max-w-lg mx-auto space-y-4">
-      <!-- Ajouter un item -->
-      <div class="card bg-base-200 shadow-xl">
-        <div class="card-body p-4">
-          <div class="flex gap-2">
-            <div class="flex-1 relative">
+    <!-- Accès refusé -->
+    <div v-else-if="!hasAccess" class="flex flex-col justify-center items-center min-h-screen text-center px-4">
+      <div class="text-6xl mb-6">🚫</div>
+      <h1 class="text-2xl font-bold mb-4">Accès non autorisé</h1>
+      <p class="opacity-70 mb-6" v-if="!isAuthenticated">
+        Vous devez vous connecter pour accéder à cette application.
+      </p>
+      <p class="opacity-70 mb-6" v-else>
+        Vous n'avez pas les droits d'accès à cette application.
+      </p>
+      <div class="flex gap-4">
+        <button v-if="!isAuthenticated" @click="login" class="btn btn-primary">
+          Se connecter
+        </button>
+        <button @click="redirectToPortal" class="btn btn-ghost">
+          Retour au portail
+        </button>
+      </div>
+    </div>
+
+    <!-- Contenu principal -->
+    <div v-else>
+      <header class="text-center mb-6">
+        <div class="flex justify-between items-center max-w-md mx-auto mb-2">
+          <a href="https://cyriongames.fr" class="btn btn-ghost btn-sm">
+            <span class="mr-1">&#8592;</span> Portail
+          </a>
+          <div class="flex items-center gap-2">
+            <span class="text-sm opacity-70">{{ user?.name }}</span>
+            <button @click="logout" class="btn btn-ghost btn-sm btn-circle" title="Déconnexion">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <h1 class="text-3xl font-bold text-primary">🛒 Shopping</h1>
+        <p class="opacity-70 mt-2">Gérez votre inventaire et vos listes de courses</p>
+      </header>
+
+      <div class="max-w-md mx-auto space-y-6">
+      <!-- Rejoindre une boutique -->
+      <section class="card bg-base-200 shadow-xl">
+        <div class="card-body">
+          <h2 class="card-title text-2xl">Rejoindre une boutique</h2>
+          <p class="opacity-70">Entrez le code PIN à 6 chiffres de votre boutique</p>
+
+          <div class="form-control">
+            <input
+              type="password"
+              v-model="joinCode"
+              class="input input-bordered text-center text-2xl tracking-widest"
+              placeholder="******"
+              maxlength="6"
+              @input="joinCode = joinCode.replace(/\D/g, '')"
+              @keyup.enter="joinBoutique"
+            />
+          </div>
+
+          <div class="card-actions justify-end mt-2">
+            <button
+              class="btn btn-secondary"
+              @click="joinBoutique"
+              :disabled="isJoining || joinCode.length !== 6"
+            >
+              <span v-if="isJoining" class="loading loading-spinner loading-sm"></span>
+              Rejoindre
+            </button>
+          </div>
+
+          <div v-if="joinError" class="alert alert-error mt-2">
+            {{ joinError }}
+          </div>
+        </div>
+      </section>
+
+      <!-- Créer une boutique (accordion fermé) -->
+      <div class="collapse collapse-arrow bg-base-200 shadow-xl">
+        <input type="checkbox" />
+        <div class="collapse-title text-xl font-medium">
+          Créer une nouvelle boutique
+        </div>
+        <div class="collapse-content">
+          <div class="space-y-4 pt-2">
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Nom de la boutique</span>
+              </label>
               <input
                 type="text"
-                v-model="newItemName"
-                @input="searchItems"
-                @keydown.down.prevent="navigateSuggestion(1)"
-                @keydown.up.prevent="navigateSuggestion(-1)"
-                @keydown.enter.prevent="handleEnter"
-                @keydown.escape="closeSuggestions"
-                @focus="showSuggestions = suggestions.length > 0"
-                class="input input-bordered w-full"
-                placeholder="Ajouter un article..."
+                v-model="boutiqueName"
+                class="input input-bordered"
+                placeholder="Ex: Maison Dupont"
               />
-              <!-- Suggestions autocomplete -->
-              <ul
-                v-if="showSuggestions && suggestions.length > 0"
-                class="absolute z-10 w-full bg-base-100 border border-base-300 rounded-lg mt-1 shadow-lg max-h-48 overflow-y-auto"
-              >
-                <li
-                  v-for="(suggestion, index) in suggestions"
-                  :key="suggestion.id"
-                  @click="selectSuggestion(suggestion)"
-                  :class="[
-                    'px-4 py-2 cursor-pointer hover:bg-base-200',
-                    index === selectedSuggestionIndex ? 'bg-base-200' : ''
-                  ]"
-                >
-                  {{ suggestion.name }}
-                </li>
-              </ul>
             </div>
-            <input
-              type="number"
-              v-model.number="newItemQuantity"
-              min="1"
-              class="input input-bordered w-20 text-center"
-              placeholder="1"
-            />
-            <button
-              class="btn btn-primary"
-              @click="addItem"
-              :disabled="!newItemName.trim() || isAdding"
-            >
-              <span v-if="isAdding" class="loading loading-spinner loading-sm"></span>
-              <span v-else>+</span>
-            </button>
+
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Code PIN boutique (6 chiffres)</span>
+              </label>
+              <input
+                type="text"
+                v-model="boutiquePin"
+                class="input input-bordered text-center text-2xl tracking-widest"
+                placeholder="000000"
+                maxlength="6"
+                @input="boutiquePin = boutiquePin.replace(/\D/g, '')"
+              />
+              <label class="label">
+                <span class="label-text-alt opacity-70">Ce code permettra à tous de rejoindre la boutique</span>
+              </label>
+            </div>
+
+            <div class="flex justify-end mt-4">
+              <button
+                class="btn btn-primary"
+                @click="createBoutique"
+                :disabled="isCreating || !boutiqueName.trim() || boutiquePin.length !== 6"
+              >
+                <span v-if="isCreating" class="loading loading-spinner loading-sm"></span>
+                Créer la boutique
+              </button>
+            </div>
+
+            <div v-if="createError" class="alert alert-error">
+              {{ createError }}
+            </div>
           </div>
         </div>
       </div>
-
-      <!-- Liste des items -->
-      <div class="card bg-base-200 shadow-xl">
-        <div class="card-body p-4">
-          <div class="flex justify-between items-center mb-2">
-            <h2 class="card-title text-lg">
-              Articles ({{ uncheckedCount }}/{{ list?.items?.length || 0 }})
-            </h2>
-            <button
-              v-if="checkedCount > 0"
-              class="btn btn-ghost btn-sm text-error"
-              @click="clearChecked"
-            >
-              Supprimer coches
-            </button>
-          </div>
-
-          <div v-if="!list || list.items.length === 0" class="text-center py-8 opacity-50">
-            Aucun article dans la liste
-          </div>
-
-          <ul v-else class="space-y-2">
-            <li
-              v-for="entry in list.items"
-              :key="entry.id"
-              class="flex items-center gap-3 p-2 rounded-lg bg-base-100"
-              :class="{ 'opacity-50': entry.checked }"
-            >
-              <input
-                type="checkbox"
-                :checked="entry.checked"
-                @change="toggleItem(entry.id)"
-                class="checkbox checkbox-primary"
-              />
-              <span class="flex-1" :class="{ 'line-through': entry.checked }">
-                {{ entry.item.name }}
-              </span>
-              <span class="badge badge-ghost">x{{ entry.quantity }}</span>
-              <button
-                class="btn btn-ghost btn-xs text-error"
-                @click="removeItem(entry.id)"
-              >
-                x
-              </button>
-            </li>
-          </ul>
-        </div>
       </div>
     </div>
   </main>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
-interface Item {
-  id: number
-  name: string
-}
+const router = useRouter()
+const { isAuthenticated, user, isLoading, hasAccess, initKeycloak, login, logout, redirectToPortal } = useAuth()
 
-interface ShoppingListItem {
-  id: number
-  quantity: number
-  checked: boolean
-  item: Item
-}
-
-interface ShoppingList {
-  id: number
-  name: string
-  items: ShoppingListItem[]
-}
-
-const list = ref<ShoppingList | null>(null)
-const newItemName = ref('')
-const newItemQuantity = ref(1)
-const isAdding = ref(false)
-
-// Autocomplete
-const suggestions = ref<Item[]>([])
-const showSuggestions = ref(false)
-const selectedSuggestionIndex = ref(-1)
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
-
-const uncheckedCount = computed(() =>
-  list.value?.items.filter(i => !i.checked).length || 0
-)
-
-const checkedCount = computed(() =>
-  list.value?.items.filter(i => i.checked).length || 0
-)
-
-onMounted(async () => {
-  await loadList()
+onMounted(() => {
+  initKeycloak()
 })
 
-async function loadList() {
-  const lists = await $fetch<ShoppingList[]>('/api/lists')
-  if (lists.length > 0) {
-    list.value = lists[0]
-  } else {
-    // Creer une liste par defaut
-    list.value = await $fetch<ShoppingList>('/api/lists', { method: 'POST' })
+// Rejoindre boutique
+const joinCode = ref('')
+const isJoining = ref(false)
+const joinError = ref('')
+
+// Créer boutique
+const boutiqueName = ref('')
+const boutiquePin = ref('')
+const isCreating = ref(false)
+const createError = ref('')
+
+async function joinBoutique() {
+  if (joinCode.value.length !== 6) return
+
+  isJoining.value = true
+  joinError.value = ''
+
+  try {
+    await $fetch('/api/boutique/' + joinCode.value)
+    router.push('/boutique/' + joinCode.value)
+  } catch (e: any) {
+    if (e.status === 404) {
+      joinError.value = 'Boutique non trouvée. Vérifiez le code PIN.'
+    } else {
+      joinError.value = e.data?.message || 'Erreur lors de la recherche'
+    }
+  } finally {
+    isJoining.value = false
   }
 }
 
-async function searchItems() {
-  if (searchTimeout) clearTimeout(searchTimeout)
-
-  const query = newItemName.value.trim()
-  if (query.length < 1) {
-    suggestions.value = []
-    showSuggestions.value = false
+async function createBoutique() {
+  if (!boutiqueName.value.trim()) return
+  if (boutiquePin.value.length !== 6) {
+    createError.value = 'Le code PIN doit contenir 6 chiffres'
     return
   }
 
-  searchTimeout = setTimeout(async () => {
-    suggestions.value = await $fetch<Item[]>('/api/items', {
-      query: { search: query }
-    })
-    showSuggestions.value = suggestions.value.length > 0
-    selectedSuggestionIndex.value = -1
-  }, 150)
-}
+  isCreating.value = true
+  createError.value = ''
 
-function navigateSuggestion(direction: number) {
-  if (!showSuggestions.value || suggestions.value.length === 0) return
-
-  selectedSuggestionIndex.value += direction
-  if (selectedSuggestionIndex.value < 0) {
-    selectedSuggestionIndex.value = suggestions.value.length - 1
-  } else if (selectedSuggestionIndex.value >= suggestions.value.length) {
-    selectedSuggestionIndex.value = 0
-  }
-}
-
-function handleEnter() {
-  if (showSuggestions.value && selectedSuggestionIndex.value >= 0) {
-    selectSuggestion(suggestions.value[selectedSuggestionIndex.value])
-  } else {
-    addItem()
-  }
-}
-
-function selectSuggestion(suggestion: Item) {
-  newItemName.value = suggestion.name
-  showSuggestions.value = false
-  selectedSuggestionIndex.value = -1
-}
-
-function closeSuggestions() {
-  showSuggestions.value = false
-  selectedSuggestionIndex.value = -1
-}
-
-async function addItem() {
-  if (!newItemName.value.trim() || !list.value) return
-
-  isAdding.value = true
   try {
-    await $fetch(`/api/lists/${list.value.id}/add-item`, {
+    const boutique = await $fetch('/api/boutique/create', {
       method: 'POST',
       body: {
-        itemName: newItemName.value.trim(),
-        quantity: newItemQuantity.value || 1
+        name: boutiqueName.value.trim(),
+        code: boutiquePin.value
       }
-    })
-    newItemName.value = ''
-    newItemQuantity.value = 1
-    closeSuggestions()
-    await loadList()
-  } catch (e) {
-    console.error(e)
+    }) as { code: string }
+
+    router.push('/boutique/' + boutique.code)
+  } catch (e: any) {
+    createError.value = e.data?.message || 'Erreur lors de la création'
   } finally {
-    isAdding.value = false
-  }
-}
-
-async function toggleItem(itemId: number) {
-  if (!list.value) return
-
-  try {
-    await $fetch(`/api/lists/${list.value.id}/toggle-item`, {
-      method: 'POST',
-      body: { itemId }
-    })
-    await loadList()
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-async function removeItem(itemId: number) {
-  if (!list.value) return
-
-  try {
-    await $fetch(`/api/lists/${list.value.id}/remove-item`, {
-      method: 'POST',
-      body: { itemId }
-    })
-    await loadList()
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-async function clearChecked() {
-  if (!list.value) return
-
-  try {
-    await $fetch(`/api/lists/${list.value.id}/clear-checked`, {
-      method: 'POST'
-    })
-    await loadList()
-  } catch (e) {
-    console.error(e)
+    isCreating.value = false
   }
 }
 </script>

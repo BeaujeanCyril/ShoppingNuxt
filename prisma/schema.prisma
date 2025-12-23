@@ -8,41 +8,43 @@ datasource db {
   schemas  = ["shopping"]
 }
 
-// Catalogue des items (pas de doublons)
+// Boutique - accessible via code PIN 6 chiffres
+model Boutique {
+  id        Int       @id @default(autoincrement())
+  name      String
+  code      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  magasins  Magasin[]
+
+  @@schema("shopping")
+}
+
+// Magasin - appartient à une boutique
+model Magasin {
+  id         Int       @id @default(autoincrement())
+  name       String
+  emoji      String    @default("🛒")
+  position   Int       @default(0)
+  boutiqueId Int
+  boutique   Boutique  @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  items      Item[]
+
+  @@schema("shopping")
+}
+
+// Item - appartient à un magasin avec quantité idéale et actuelle
 model Item {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  createdAt DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  name            String
+  idealQuantity   Int      @default(1)
+  currentQuantity Int      @default(0)
+  magasinId       Int
+  magasin         Magasin  @relation(fields: [magasinId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  shoppingListItems ShoppingListItem[]
-
-  @@schema("shopping")
-}
-
-// Liste de courses
-model ShoppingList {
-  id        Int      @id @default(autoincrement())
-  name      String   @default("Ma liste")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  items ShoppingListItem[]
-
-  @@schema("shopping")
-}
-
-// Items dans une liste de courses
-model ShoppingListItem {
-  id             Int          @id @default(autoincrement())
-  quantity       Int          @default(1)
-  checked        Boolean      @default(false)
-  shoppingListId Int
-  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
-  itemId         Int
-  item           Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  @@unique([shoppingListId, itemId])
   @@schema("shopping")
 }
