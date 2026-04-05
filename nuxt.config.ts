@@ -8,6 +8,9 @@ export default defineNuxtConfig({
     }
   },
   nitro: {
+    security: {
+      headers: false
+    },
     routeRules: {
       '/api/popote/**': {
         cors: true,
