@@ -29,9 +29,14 @@
       <section class="mb-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold">Mes magasins</h2>
-          <button class="btn btn-primary btn-sm" @click="showAddModal = true">
-            + Ajouter
-          </button>
+          <div class="flex gap-2">
+            <NuxtLink :to="`/boutique/${code}/articles`" class="btn btn-outline btn-sm">
+              Tous les articles
+            </NuxtLink>
+            <button class="btn btn-primary btn-sm" @click="showAddModal = true">
+              + Ajouter
+            </button>
+          </div>
         </div>
 
         <!-- Grille des magasins -->

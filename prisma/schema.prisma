@@ -10,12 +10,13 @@ datasource db {
 
 // Boutique - accessible via code PIN 6 chiffres
 model Boutique {
-  id        Int       @id @default(autoincrement())
-  name      String
-  code      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  magasins  Magasin[]
+  id         Int       @id @default(autoincrement())
+  name       String
+  code       String    @unique
+  familyCode String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  magasins   Magasin[]
 
   @@schema("shopping")
 }

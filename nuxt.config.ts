@@ -6,5 +6,16 @@ export default defineNuxtConfig({
     plugins: {
       '@tailwindcss/postcss': {}
     }
+  },
+  nitro: {
+    routeRules: {
+      '/api/popote/**': {
+        cors: true,
+        headers: {
+          'Access-Control-Allow-Origin': 'https://popote.cyriongames.fr',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        }
+      }
+    }
   }
 })
