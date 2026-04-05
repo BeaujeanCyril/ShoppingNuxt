@@ -13,7 +13,7 @@ export default defineNuxtConfig({
         cors: true,
         headers: {
           'Access-Control-Allow-Origin': 'https://popote.cyriongames.fr',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         }
       }
     }
