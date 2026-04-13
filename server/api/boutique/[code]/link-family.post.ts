@@ -1,4 +1,5 @@
 import prisma from '~/server/utils/db'
+import { findBoutique } from '~/server/utils/boutique'
 
 export default defineEventHandler(async (event) => {
   const code = getRouterParam(event, 'code')
@@ -20,9 +21,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const boutique = await prisma.boutique.findUnique({
-    where: { code }
-  })
+  const boutique = await findBoutique(code)
 
   if (!boutique) {
     throw createError({
@@ -32,7 +31,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const updated = await prisma.boutique.update({
-    where: { code },
+    where: { id: boutique.id },
     data: { familyCode }
   })
 

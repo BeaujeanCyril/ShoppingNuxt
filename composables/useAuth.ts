@@ -7,10 +7,12 @@ const keycloakConfig = {
 }
 
 let keycloakInstance: Keycloak | null = null
+let keycloakInitialized = false
 
 export const useAuth = () => {
   const isAuthenticated = useState<boolean>('isAuthenticated', () => false)
-  const user = useState<{ name: string; email: string } | null>('user', () => null)
+  const user = useState<{ id: string; name: string; email: string } | null>('user', () => null)
+  const token = useState<string | null>('authToken', () => null)
   const isLoading = useState<boolean>('authLoading', () => true)
   const hasAccess = useState<boolean>('hasAccess', () => false)
 
@@ -20,9 +22,16 @@ export const useAuth = () => {
       return
     }
 
+    if (keycloakInitialized) {
+      isLoading.value = false
+      return
+    }
+
     if (!keycloakInstance) {
       keycloakInstance = new Keycloak(keycloakConfig)
     }
+
+    keycloakInitialized = true
 
     try {
       const authenticated = await keycloakInstance.init({
@@ -32,9 +41,11 @@ export const useAuth = () => {
       })
 
       isAuthenticated.value = authenticated
+      token.value = keycloakInstance.token || null
 
       if (authenticated && keycloakInstance.tokenParsed) {
         user.value = {
+          id: keycloakInstance.tokenParsed.sub || '',
           name: keycloakInstance.tokenParsed.preferred_username || keycloakInstance.tokenParsed.name || 'Utilisateur',
           email: keycloakInstance.tokenParsed.email || ''
         }
@@ -72,6 +83,7 @@ export const useAuth = () => {
   return {
     isAuthenticated: readonly(isAuthenticated),
     user: readonly(user),
+    token: readonly(token),
     isLoading: readonly(isLoading),
     hasAccess: readonly(hasAccess),
     initKeycloak,

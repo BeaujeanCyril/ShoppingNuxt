@@ -45,167 +45,55 @@
         <p class="opacity-70 mt-2">Gérez votre inventaire et vos listes de courses</p>
       </header>
 
-      <div class="max-w-md mx-auto space-y-6">
-      <!-- Rejoindre une boutique -->
-      <section class="card bg-base-200 shadow-xl">
-        <div class="card-body">
-          <h2 class="card-title text-2xl">Rejoindre une boutique</h2>
-          <p class="opacity-70">Entrez le code PIN à 6 chiffres de votre boutique</p>
-
-          <div class="form-control">
-            <input
-              type="password"
-              v-model="joinCode"
-              class="input input-bordered text-center text-2xl tracking-widest"
-              placeholder="******"
-              maxlength="6"
-              @input="joinCode = joinCode.replace(/\D/g, '')"
-              @keyup.enter="joinBoutique"
-            />
-          </div>
-
-          <div class="card-actions justify-end mt-2">
-            <button
-              class="btn btn-secondary"
-              @click="joinBoutique"
-              :disabled="isJoining || joinCode.length !== 6"
-            >
-              <span v-if="isJoining" class="loading loading-spinner loading-sm"></span>
-              Rejoindre
-            </button>
-          </div>
-
-          <div v-if="joinError" class="alert alert-error mt-2">
-            {{ joinError }}
-          </div>
-        </div>
-      </section>
-
-      <!-- Créer une boutique (accordion fermé) -->
-      <div class="collapse collapse-arrow bg-base-200 shadow-xl">
-        <input type="checkbox" />
-        <div class="collapse-title text-xl font-medium">
-          Créer une nouvelle boutique
-        </div>
-        <div class="collapse-content">
-          <div class="space-y-4 pt-2">
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text">Nom de la boutique</span>
-              </label>
-              <input
-                type="text"
-                v-model="boutiqueName"
-                class="input input-bordered"
-                placeholder="Ex: Maison Dupont"
-              />
-            </div>
-
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text">Code PIN boutique (6 chiffres)</span>
-              </label>
-              <input
-                type="text"
-                v-model="boutiquePin"
-                class="input input-bordered text-center text-2xl tracking-widest"
-                placeholder="000000"
-                maxlength="6"
-                @input="boutiquePin = boutiquePin.replace(/\D/g, '')"
-              />
-              <label class="label">
-                <span class="label-text-alt opacity-70">Ce code permettra à tous de rejoindre la boutique</span>
-              </label>
-            </div>
-
-            <div class="flex justify-end mt-4">
-              <button
-                class="btn btn-primary"
-                @click="createBoutique"
-                :disabled="isCreating || !boutiqueName.trim() || boutiquePin.length !== 6"
-              >
-                <span v-if="isCreating" class="loading loading-spinner loading-sm"></span>
-                Créer la boutique
-              </button>
-            </div>
-
-            <div v-if="createError" class="alert alert-error">
-              {{ createError }}
-            </div>
-          </div>
-        </div>
+      <!-- Auto-join en cours -->
+      <div v-if="isAutoJoining" class="flex flex-col justify-center items-center py-12">
+        <span class="loading loading-spinner loading-lg text-primary"></span>
+        <p class="mt-4 opacity-70">Chargement de votre boutique...</p>
       </div>
+
+      <div v-else-if="autoJoinError" class="max-w-md mx-auto">
+        <div class="alert alert-error mb-4">
+          {{ autoJoinError }}
+        </div>
       </div>
     </div>
   </main>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const { isAuthenticated, user, isLoading, hasAccess, initKeycloak, login, logout, redirectToPortal } = useAuth()
 
+const isAutoJoining = ref(false)
+const autoJoinError = ref('')
+
 onMounted(() => {
   initKeycloak()
 })
 
-// Rejoindre boutique
-const joinCode = ref('')
-const isJoining = ref(false)
-const joinError = ref('')
+// Quand l'auth est prête et l'utilisateur connecté, auto-join
+watch([isLoading, isAuthenticated, hasAccess, user], async ([loading, authenticated, access, u]: [boolean, boolean, boolean, { id: string; name: string; email: string } | null]) => {
+  if (loading || !authenticated || !access || !u?.id) return
 
-// Créer boutique
-const boutiqueName = ref('')
-const boutiquePin = ref('')
-const isCreating = ref(false)
-const createError = ref('')
-
-async function joinBoutique() {
-  if (joinCode.value.length !== 6) return
-
-  isJoining.value = true
-  joinError.value = ''
+  isAutoJoining.value = true
+  autoJoinError.value = ''
 
   try {
-    await $fetch('/api/boutique/' + joinCode.value)
-    router.push('/boutique/' + joinCode.value)
-  } catch (e: any) {
-    if (e.status === 404) {
-      joinError.value = 'Boutique non trouvée. Vérifiez le code PIN.'
-    } else {
-      joinError.value = e.data?.message || 'Erreur lors de la recherche'
-    }
-  } finally {
-    isJoining.value = false
-  }
-}
-
-async function createBoutique() {
-  if (!boutiqueName.value.trim()) return
-  if (boutiquePin.value.length !== 6) {
-    createError.value = 'Le code PIN doit contenir 6 chiffres'
-    return
-  }
-
-  isCreating.value = true
-  createError.value = ''
-
-  try {
-    const boutique = await $fetch('/api/boutique/create', {
+    const boutique = await $fetch('/api/boutique/me', {
       method: 'POST',
       body: {
-        name: boutiqueName.value.trim(),
-        code: boutiquePin.value
+        keycloakUserId: u.id,
+        name: `Boutique de ${u.name}`
       }
-    }) as { code: string }
+    }) as { keycloakUserId: string }
 
-    router.push('/boutique/' + boutique.code)
+    router.push('/boutique/' + boutique.keycloakUserId)
   } catch (e: any) {
-    createError.value = e.data?.message || 'Erreur lors de la création'
-  } finally {
-    isCreating.value = false
+    autoJoinError.value = e.data?.message || 'Erreur lors du chargement de votre boutique'
+    isAutoJoining.value = false
   }
-}
+}, { immediate: true })
 </script>

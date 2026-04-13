@@ -1,29 +1,50 @@
 import prisma from '~/server/utils/db'
+import { findBoutique } from '~/server/utils/boutique'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const code = query.code as string | undefined
+  const userId = query.userId as string | undefined
   const familyCode = query.familyCode as string | undefined
 
-  if (!code && !familyCode) {
+  if (!code && !userId && !familyCode) {
     throw createError({
       statusCode: 400,
-      message: 'Le paramètre "code" ou "familyCode" est requis'
+      message: 'Le paramètre "code", "userId" ou "familyCode" est requis'
     })
   }
 
-  const boutique = await prisma.boutique.findFirst({
-    where: code ? { code } : { familyCode },
-    include: {
-      magasins: {
+  let boutique
+  if (code || userId) {
+    const baseBoutique = await findBoutique((code || userId)!)
+    if (baseBoutique) {
+      boutique = await prisma.boutique.findUnique({
+        where: { id: baseBoutique.id },
         include: {
-          items: {
-            where: { currentQuantity: { gt: 0 } }
+          magasins: {
+            include: {
+              items: {
+                where: { currentQuantity: { gt: 0 } }
+              }
+            }
+          }
+        }
+      })
+    }
+  } else {
+    boutique = await prisma.boutique.findFirst({
+      where: { familyCode },
+      include: {
+        magasins: {
+          include: {
+            items: {
+              where: { currentQuantity: { gt: 0 } }
+            }
           }
         }
       }
-    }
-  })
+    })
+  }
 
   if (!boutique) {
     throw createError({

@@ -1,4 +1,5 @@
 import prisma from '~/server/utils/db'
+import { findBoutique } from '~/server/utils/boutique'
 
 export default defineEventHandler(async (event) => {
   const code = getRouterParam(event, 'code')
@@ -19,7 +20,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Vérifier que la boutique existe
-  const boutique = await prisma.boutique.findUnique({ where: { code } })
+  const boutique = await findBoutique(code)
   if (!boutique) {
     throw createError({
       statusCode: 404,
