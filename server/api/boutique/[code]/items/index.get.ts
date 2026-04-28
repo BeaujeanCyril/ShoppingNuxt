@@ -20,21 +20,22 @@ export default defineEventHandler(async (event) => {
       magasin: { boutiqueId: boutique.id },
       ...(search ? { name: { contains: search, mode: 'insensitive' } } : {})
     },
-    select: { name: true },
-    orderBy: { name: 'asc' },
-    take: 50
+    select: { name: true, magasinId: true, updatedAt: true },
+    orderBy: { updatedAt: 'desc' },
+    take: 100
   })
 
-  // Distinct par nom (case-insensitive), conserve la 1ère casse rencontrée
+  // Distinct par nom (case-insensitive). Garde la 1ère occurrence rencontrée
+  // (la plus récemment modifiée grâce à orderBy updatedAt desc).
   const seen = new Set<string>()
-  const names: string[] = []
+  const suggestions: { name: string; magasinId: number }[] = []
   for (const it of items) {
     const key = it.name.toLowerCase()
     if (!seen.has(key)) {
       seen.add(key)
-      names.push(it.name)
+      suggestions.push({ name: it.name, magasinId: it.magasinId })
     }
   }
 
-  return names.slice(0, 20)
+  return suggestions.slice(0, 20)
 })

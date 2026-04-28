@@ -164,7 +164,7 @@
             @keyup.enter="addToShoppingList"
           />
           <datalist id="shopping-suggestions">
-            <option v-for="s in shoppingSuggestions" :key="s" :value="s" />
+            <option v-for="s in shoppingSuggestions" :key="s.name" :value="s.name" />
           </datalist>
         </div>
 
@@ -201,15 +201,60 @@
 
         <div v-if="shoppingAdded.length" class="mt-4">
           <div class="text-sm font-semibold mb-2">Ajoutés à la liste ({{ shoppingAdded.length }})</div>
-          <ul class="text-sm space-y-1 max-h-40 overflow-y-auto">
-            <li v-for="(entry, i) in shoppingAdded" :key="i" class="flex justify-between gap-2 opacity-80">
-              <span>
-                <span class="badge badge-sm" :class="entry.created ? 'badge-success' : 'badge-info'">
-                  {{ entry.created ? 'nouveau' : 'liste' }}
-                </span>
-                {{ entry.name }} × {{ entry.quantity }}
-              </span>
-              <span class="opacity-60">{{ entry.magasinName }}</span>
+          <ul class="text-sm space-y-2 max-h-60 overflow-y-auto">
+            <li
+              v-for="(entry, i) in shoppingAdded"
+              :key="entry.itemId + '-' + i"
+              class="border border-base-300 rounded p-2"
+            >
+              <template v-if="editingShoppingIndex !== i">
+                <div class="flex items-center justify-between gap-2">
+                  <span>
+                    <span class="badge badge-sm mr-1" :class="entry.created ? 'badge-success' : 'badge-info'">
+                      {{ entry.created ? 'nouveau' : 'liste' }}
+                    </span>
+                    <span class="font-medium">{{ entry.name }}</span>
+                    <span class="opacity-70"> × {{ entry.quantity }}</span>
+                  </span>
+                  <span class="opacity-60 text-xs">{{ magasinLabel(entry.magasinId) }}</span>
+                </div>
+                <div class="flex gap-1 mt-1 justify-end">
+                  <button class="btn btn-xs btn-ghost" @click="startEditShoppingEntry(i)">Modifier</button>
+                  <button class="btn btn-xs btn-error btn-outline" @click="deleteShoppingEntry(i)">Retirer</button>
+                </div>
+              </template>
+              <template v-else>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    v-model="editShoppingForm.name"
+                    class="input input-bordered input-sm sm:col-span-2"
+                    placeholder="Nom"
+                  />
+                  <input
+                    type="number"
+                    v-model.number="editShoppingForm.quantity"
+                    class="input input-bordered input-sm"
+                    min="1"
+                  />
+                  <select v-model.number="editShoppingForm.magasinId" class="select select-bordered select-sm">
+                    <option v-for="m in boutique?.magasins" :key="m.id" :value="m.id">
+                      {{ m.emoji }} {{ m.name }}
+                    </option>
+                  </select>
+                </div>
+                <div class="flex gap-1 mt-2 justify-end">
+                  <button class="btn btn-xs btn-ghost" @click="cancelEditShoppingEntry">Annuler</button>
+                  <button
+                    class="btn btn-xs btn-primary"
+                    @click="saveEditShoppingEntry"
+                    :disabled="isEditingShopping || !editShoppingForm.name.trim() || !editShoppingForm.magasinId || !editShoppingForm.quantity"
+                  >
+                    <span v-if="isEditingShopping" class="loading loading-spinner loading-xs"></span>
+                    Enregistrer
+                  </button>
+                </div>
+              </template>
             </li>
           </ul>
         </div>
@@ -261,8 +306,18 @@ const emojiOptions = ['🛒', '🏪', '🥖', '💊', '🥩', '🧀', '🍷', '�
 // Modal liste de course
 const showShoppingModal = ref(false)
 const shoppingForm = ref({ name: '', quantity: 1, magasinId: 0 })
-const shoppingSuggestions = ref<string[]>([])
-const shoppingAdded = ref<{ name: string; quantity: number; magasinName: string; created: boolean }[]>([])
+const shoppingSuggestions = ref<{ name: string; magasinId: number }[]>([])
+interface ShoppingEntry {
+  itemId: number
+  magasinId: number
+  name: string
+  quantity: number
+  created: boolean
+}
+const shoppingAdded = ref<ShoppingEntry[]>([])
+const editingShoppingIndex = ref<number | null>(null)
+const editShoppingForm = ref<{ name: string; quantity: number; magasinId: number }>({ name: '', quantity: 1, magasinId: 0 })
+const isEditingShopping = ref(false)
 const shoppingError = ref('')
 const isShoppingAdding = ref(false)
 const shoppingNameInput = ref<HTMLInputElement | null>(null)
@@ -347,7 +402,17 @@ function closeShoppingListModal() {
   }
 }
 
+type ItemSuggestion = { name: string; magasinId: number }
+
 function onShoppingNameInput() {
+  // Si la valeur saisie correspond exactement à une suggestion connue,
+  // pré-sélectionne automatiquement son magasin.
+  const current = shoppingForm.value.name.trim().toLowerCase()
+  const match = shoppingSuggestions.value.find((s: ItemSuggestion) => s.name.toLowerCase() === current)
+  if (match) {
+    shoppingForm.value.magasinId = match.magasinId
+  }
+
   if (suggestionsTimer) clearTimeout(suggestionsTimer)
   const term = shoppingForm.value.name.trim()
   if (term.length < 2) {
@@ -358,11 +423,91 @@ function onShoppingNameInput() {
     try {
       shoppingSuggestions.value = await $fetch(
         `/api/boutique/${code}/items?search=${encodeURIComponent(term)}`
-      ) as string[]
+      ) as ItemSuggestion[]
+      // Re-vérifie après réception (cas où l'utilisateur a fini de taper avant la réponse)
+      const cur = shoppingForm.value.name.trim().toLowerCase()
+      const m = shoppingSuggestions.value.find((s: ItemSuggestion) => s.name.toLowerCase() === cur)
+      if (m) shoppingForm.value.magasinId = m.magasinId
     } catch {
       shoppingSuggestions.value = []
     }
   }, 200)
+}
+
+function magasinLabel(magasinId: number): string {
+  const m = boutique.value?.magasins.find((x: Magasin) => x.id === magasinId)
+  return m ? `${m.emoji} ${m.name}` : ''
+}
+
+function startEditShoppingEntry(index: number) {
+  const entry = shoppingAdded.value[index]
+  if (!entry) return
+  editShoppingForm.value = {
+    name: entry.name,
+    quantity: entry.quantity,
+    magasinId: entry.magasinId
+  }
+  editingShoppingIndex.value = index
+}
+
+function cancelEditShoppingEntry() {
+  editingShoppingIndex.value = null
+}
+
+async function saveEditShoppingEntry() {
+  if (editingShoppingIndex.value == null) return
+  const idx = editingShoppingIndex.value
+  const entry = shoppingAdded.value[idx]
+  if (!entry) return
+
+  const newName = editShoppingForm.value.name.trim()
+  const newQuantity = editShoppingForm.value.quantity
+  const newMagasinId = editShoppingForm.value.magasinId
+  if (!newName || !newQuantity || newQuantity < 1 || !newMagasinId) return
+
+  isEditingShopping.value = true
+  try {
+    // Revert l'action initiale
+    await $fetch(`/api/boutique/${code}/shopping-list/revert`, {
+      method: 'POST',
+      body: { itemId: entry.itemId, quantity: entry.quantity, created: entry.created }
+    })
+    // Re-applique avec les nouvelles valeurs
+    const res = await $fetch(`/api/boutique/${code}/shopping-list/add`, {
+      method: 'POST',
+      body: { magasinId: newMagasinId, name: newName, quantity: newQuantity }
+    }) as { item: { id: number; name: string; magasinId: number }; created: boolean }
+
+    shoppingAdded.value[idx] = {
+      itemId: res.item.id,
+      magasinId: res.item.magasinId,
+      name: res.item.name,
+      quantity: newQuantity,
+      created: res.created
+    }
+    editingShoppingIndex.value = null
+  } catch (e: any) {
+    shoppingError.value = e.data?.message || 'Erreur lors de la modification'
+  } finally {
+    isEditingShopping.value = false
+  }
+}
+
+async function deleteShoppingEntry(index: number) {
+  const entry = shoppingAdded.value[index]
+  if (!entry) return
+  if (!confirm(`Retirer "${entry.name}" × ${entry.quantity} de la liste ?`)) return
+
+  try {
+    await $fetch(`/api/boutique/${code}/shopping-list/revert`, {
+      method: 'POST',
+      body: { itemId: entry.itemId, quantity: entry.quantity, created: entry.created }
+    })
+    shoppingAdded.value.splice(index, 1)
+    if (editingShoppingIndex.value === index) editingShoppingIndex.value = null
+  } catch (e: any) {
+    shoppingError.value = e.data?.message || 'Erreur lors de la suppression'
+  }
 }
 
 async function addToShoppingList() {
@@ -383,12 +528,12 @@ async function addToShoppingList() {
           quantity: shoppingForm.value.quantity
         }
       }
-    ) as { item: { name: string }; created: boolean }
-    const magasin = boutique.value?.magasins.find((m: Magasin) => m.id === shoppingForm.value.magasinId)
+    ) as { item: { id: number; name: string; magasinId: number }; created: boolean }
     shoppingAdded.value.unshift({
+      itemId: res.item.id,
+      magasinId: res.item.magasinId,
       name: res.item.name,
       quantity: shoppingForm.value.quantity,
-      magasinName: magasin ? `${magasin.emoji} ${magasin.name}` : '',
       created: res.created
     })
     shoppingForm.value.name = ''
