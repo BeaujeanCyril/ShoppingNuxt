@@ -29,10 +29,13 @@
       <section class="mb-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold">Mes magasins</h2>
-          <div class="flex gap-2">
+          <div class="flex gap-2 flex-wrap">
             <NuxtLink :to="`/boutique/${code}/articles`" class="btn btn-outline btn-sm">
               Tous les articles
             </NuxtLink>
+            <button class="btn btn-secondary btn-sm" @click="openShoppingListModal" :disabled="!boutique?.magasins?.length">
+              🛒 Créer une liste de course
+            </button>
             <button class="btn btn-primary btn-sm" @click="showAddModal = true">
               + Ajouter
             </button>
@@ -142,6 +145,83 @@
         <button @click="closeAddModal">close</button>
       </form>
     </dialog>
+
+    <!-- Modal liste de course -->
+    <dialog :class="['modal', { 'modal-open': showShoppingModal }]">
+      <div class="modal-box max-w-lg">
+        <h3 class="font-bold text-lg mb-4">🛒 Créer une liste de course</h3>
+
+        <div class="form-control mb-3">
+          <label class="label py-1"><span class="label-text">Article</span></label>
+          <input
+            ref="shoppingNameInput"
+            type="text"
+            v-model="shoppingForm.name"
+            class="input input-bordered"
+            placeholder="Ex: Lait, Pain..."
+            list="shopping-suggestions"
+            @input="onShoppingNameInput"
+            @keyup.enter="addToShoppingList"
+          />
+          <datalist id="shopping-suggestions">
+            <option v-for="s in shoppingSuggestions" :key="s" :value="s" />
+          </datalist>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div class="form-control">
+            <label class="label py-1"><span class="label-text">Quantité</span></label>
+            <input
+              type="number"
+              v-model.number="shoppingForm.quantity"
+              class="input input-bordered"
+              min="1"
+            />
+          </div>
+          <div class="form-control">
+            <label class="label py-1"><span class="label-text">Magasin</span></label>
+            <select v-model.number="shoppingForm.magasinId" class="select select-bordered">
+              <option v-for="m in boutique?.magasins" :key="m.id" :value="m.id">
+                {{ m.emoji }} {{ m.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div v-if="shoppingError" class="alert alert-error mb-3 py-2">{{ shoppingError }}</div>
+
+        <button
+          class="btn btn-primary w-full"
+          @click="addToShoppingList"
+          :disabled="isShoppingAdding || !shoppingForm.name.trim() || !shoppingForm.magasinId || !shoppingForm.quantity"
+        >
+          <span v-if="isShoppingAdding" class="loading loading-spinner loading-sm"></span>
+          Ajouter à la liste
+        </button>
+
+        <div v-if="shoppingAdded.length" class="mt-4">
+          <div class="text-sm font-semibold mb-2">Ajoutés à la liste ({{ shoppingAdded.length }})</div>
+          <ul class="text-sm space-y-1 max-h-40 overflow-y-auto">
+            <li v-for="(entry, i) in shoppingAdded" :key="i" class="flex justify-between gap-2 opacity-80">
+              <span>
+                <span class="badge badge-sm" :class="entry.created ? 'badge-success' : 'badge-info'">
+                  {{ entry.created ? 'nouveau' : 'liste' }}
+                </span>
+                {{ entry.name }} × {{ entry.quantity }}
+              </span>
+              <span class="opacity-60">{{ entry.magasinName }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="closeShoppingListModal">Terminer</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="closeShoppingListModal">close</button>
+      </form>
+    </dialog>
   </main>
 </template>
 
@@ -177,6 +257,16 @@ const isAdding = ref(false)
 const addError = ref('')
 
 const emojiOptions = ['🛒', '🏪', '🥖', '💊', '🥩', '🧀', '🍷', '🌿', '🔧', '👕', '📚', '🎮']
+
+// Modal liste de course
+const showShoppingModal = ref(false)
+const shoppingForm = ref({ name: '', quantity: 1, magasinId: 0 })
+const shoppingSuggestions = ref<string[]>([])
+const shoppingAdded = ref<{ name: string; quantity: number; magasinName: string; created: boolean }[]>([])
+const shoppingError = ref('')
+const isShoppingAdding = ref(false)
+const shoppingNameInput = ref<HTMLInputElement | null>(null)
+let suggestionsTimer: ReturnType<typeof setTimeout> | null = null
 
 // Computed
 const totalShoppingItems = computed(() => {
@@ -235,6 +325,81 @@ function closeAddModal() {
   showAddModal.value = false
   newMagasin.value = { name: '', emoji: '🛒' }
   addError.value = ''
+}
+
+function openShoppingListModal() {
+  if (!boutique.value?.magasins?.length) return
+  shoppingForm.value = {
+    name: '',
+    quantity: 1,
+    magasinId: boutique.value.magasins[0].id
+  }
+  shoppingAdded.value = []
+  shoppingSuggestions.value = []
+  shoppingError.value = ''
+  showShoppingModal.value = true
+}
+
+function closeShoppingListModal() {
+  showShoppingModal.value = false
+  if (shoppingAdded.value.length > 0) {
+    loadBoutique()
+  }
+}
+
+function onShoppingNameInput() {
+  if (suggestionsTimer) clearTimeout(suggestionsTimer)
+  const term = shoppingForm.value.name.trim()
+  if (term.length < 2) {
+    shoppingSuggestions.value = []
+    return
+  }
+  suggestionsTimer = setTimeout(async () => {
+    try {
+      shoppingSuggestions.value = await $fetch(
+        `/api/boutique/${code}/items?search=${encodeURIComponent(term)}`
+      ) as string[]
+    } catch {
+      shoppingSuggestions.value = []
+    }
+  }, 200)
+}
+
+async function addToShoppingList() {
+  const name = shoppingForm.value.name.trim()
+  if (!name || !shoppingForm.value.magasinId || !shoppingForm.value.quantity) return
+
+  isShoppingAdding.value = true
+  shoppingError.value = ''
+
+  try {
+    const res = await $fetch(
+      `/api/boutique/${code}/shopping-list/add`,
+      {
+        method: 'POST',
+        body: {
+          magasinId: shoppingForm.value.magasinId,
+          name,
+          quantity: shoppingForm.value.quantity
+        }
+      }
+    ) as { item: { name: string }; created: boolean }
+    const magasin = boutique.value?.magasins.find((m: Magasin) => m.id === shoppingForm.value.magasinId)
+    shoppingAdded.value.unshift({
+      name: res.item.name,
+      quantity: shoppingForm.value.quantity,
+      magasinName: magasin ? `${magasin.emoji} ${magasin.name}` : '',
+      created: res.created
+    })
+    shoppingForm.value.name = ''
+    shoppingForm.value.quantity = 1
+    shoppingSuggestions.value = []
+    shoppingNameInput.value?.focus()
+  } catch (e: any) {
+    shoppingError.value = e.data?.message || 'Erreur lors de l\'ajout'
+  } finally {
+    isShoppingAdding.value = false
+  }
 }
 
 onMounted(() => {
