@@ -29,7 +29,8 @@ export default defineEventHandler(async (event) => {
     },
     include: {
       items: {
-        orderBy: { name: 'asc' }
+        orderBy: { name: 'asc' },
+        include: { category: true }
       }
     }
   })

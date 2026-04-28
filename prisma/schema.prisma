@@ -18,6 +18,23 @@ model Boutique {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   magasins        Magasin[]
+  categories      Category[]
+
+  @@schema("shopping")
+}
+
+// Catégorie - regroupement d'items (ex: Frais, Surgelés, Entretien...)
+// Implique tacitement un lieu de stockage à la maison.
+model Category {
+  id         Int       @id @default(autoincrement())
+  name       String
+  emoji      String    @default("🏷️")
+  position   Int       @default(0)
+  boutiqueId Int
+  boutique   Boutique  @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  items      Item[]
 
   @@schema("shopping")
 }
@@ -39,14 +56,16 @@ model Magasin {
 
 // Item - appartient à un magasin avec quantité idéale et actuelle
 model Item {
-  id              Int      @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   name            String
-  idealQuantity   Int      @default(1)
-  currentQuantity Int      @default(0)
+  idealQuantity   Int       @default(1)
+  currentQuantity Int       @default(0)
   magasinId       Int
-  magasin         Magasin  @relation(fields: [magasinId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  magasin         Magasin   @relation(fields: [magasinId], references: [id], onDelete: Cascade)
+  categoryId      Int?
+  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@schema("shopping")
 }

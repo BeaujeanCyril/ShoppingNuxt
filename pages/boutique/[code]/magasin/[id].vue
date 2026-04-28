@@ -68,6 +68,9 @@
                   <h3 class="font-semibold">{{ item.name }}</h3>
                   <p class="text-sm opacity-70">
                     Idéal: {{ item.idealQuantity }}
+                    <span v-if="item.category" class="badge badge-sm badge-outline ml-2">
+                      {{ item.category.emoji }} {{ item.category.name }}
+                    </span>
                   </p>
                 </div>
 
@@ -151,6 +154,9 @@
                     <span class="opacity-70">
                       (manque {{ item.idealQuantity - item.currentQuantity }})
                     </span>
+                    <span v-if="item.category" class="badge badge-sm badge-outline ml-2">
+                      {{ item.category.emoji }} {{ item.category.name }}
+                    </span>
                   </p>
                 </div>
 
@@ -220,6 +226,18 @@
           />
         </div>
 
+        <div class="form-control mb-4">
+          <label class="label">
+            <span class="label-text">Catégorie</span>
+          </label>
+          <select v-model.number="itemForm.categoryId" class="select select-bordered">
+            <option :value="null">— Aucune —</option>
+            <option v-for="c in categories" :key="c.id" :value="c.id">
+              {{ c.emoji }} {{ c.name }}
+            </option>
+          </select>
+        </div>
+
         <div v-if="formError" class="alert alert-error mb-4">
           {{ formError }}
         </div>
@@ -247,11 +265,19 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 
+interface Category {
+  id: number
+  name: string
+  emoji: string
+}
+
 interface Item {
   id: number
   name: string
   idealQuantity: number
   currentQuantity: number
+  categoryId?: number | null
+  category?: Category | null
 }
 
 interface Magasin {
@@ -274,7 +300,8 @@ const activeTab = ref<'inventory' | 'shopping'>('inventory')
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const editingItem = ref<Item | null>(null)
-const itemForm = ref({ name: '', idealQuantity: 1, currentQuantity: 0 })
+const itemForm = ref<{ name: string; idealQuantity: number; currentQuantity: number; categoryId: number | null }>({ name: '', idealQuantity: 1, currentQuantity: 0, categoryId: null })
+const categories = ref<Category[]>([])
 const isSaving = ref(false)
 const formError = ref('')
 
@@ -293,6 +320,8 @@ async function loadMagasin() {
     const response = await $fetch<{ magasin: Magasin, items: Item[] }>(`/api/boutique/${code}/magasins/${magasinId}/items`)
     magasin.value = response.magasin
     items.value = response.items
+    // Charger les catégories de la boutique
+    categories.value = await $fetch<Category[]>(`/api/boutique/${code}/categories`)
   } catch (e: any) {
     error.value = e.data?.message || 'Erreur lors du chargement'
   } finally {
@@ -311,7 +340,8 @@ async function addItem() {
       method: 'POST',
       body: {
         name: itemForm.value.name.trim(),
-        idealQuantity: itemForm.value.idealQuantity || 1
+        idealQuantity: itemForm.value.idealQuantity || 1,
+        categoryId: itemForm.value.categoryId
       }
     })
 
@@ -336,7 +366,8 @@ async function updateItem() {
       body: {
         name: itemForm.value.name.trim(),
         idealQuantity: itemForm.value.idealQuantity || 1,
-        currentQuantity: itemForm.value.currentQuantity || 0
+        currentQuantity: itemForm.value.currentQuantity || 0,
+        categoryId: itemForm.value.categoryId
       }
     })
 
@@ -417,7 +448,8 @@ function openEditModal(item: Item) {
   itemForm.value = {
     name: item.name,
     idealQuantity: item.idealQuantity,
-    currentQuantity: item.currentQuantity
+    currentQuantity: item.currentQuantity,
+    categoryId: item.categoryId ?? null
   }
   showEditModal.value = true
 }
@@ -426,7 +458,7 @@ function closeModal() {
   showAddModal.value = false
   showEditModal.value = false
   editingItem.value = null
-  itemForm.value = { name: '', idealQuantity: 1, currentQuantity: 0 }
+  itemForm.value = { name: '', idealQuantity: 1, currentQuantity: 0, categoryId: null }
   formError.value = ''
 }
 

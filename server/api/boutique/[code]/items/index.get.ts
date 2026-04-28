@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
       magasin: { boutiqueId: boutique.id },
       ...(search ? { name: { contains: search, mode: 'insensitive' } } : {})
     },
-    select: { name: true, magasinId: true, updatedAt: true },
+    select: { name: true, magasinId: true, categoryId: true, updatedAt: true },
     orderBy: { updatedAt: 'desc' },
     take: 100
   })
@@ -28,12 +28,12 @@ export default defineEventHandler(async (event) => {
   // Distinct par nom (case-insensitive). Garde la 1ère occurrence rencontrée
   // (la plus récemment modifiée grâce à orderBy updatedAt desc).
   const seen = new Set<string>()
-  const suggestions: { name: string; magasinId: number }[] = []
+  const suggestions: { name: string; magasinId: number; categoryId: number | null }[] = []
   for (const it of items) {
     const key = it.name.toLowerCase()
     if (!seen.has(key)) {
       seen.add(key)
-      suggestions.push({ name: it.name, magasinId: it.magasinId })
+      suggestions.push({ name: it.name, magasinId: it.magasinId, categoryId: it.categoryId })
     }
   }
 

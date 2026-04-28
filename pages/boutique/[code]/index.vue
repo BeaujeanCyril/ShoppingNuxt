@@ -33,6 +33,9 @@
             <NuxtLink :to="`/boutique/${code}/articles`" class="btn btn-outline btn-sm">
               Tous les articles
             </NuxtLink>
+            <button class="btn btn-accent btn-sm" @click="openCategoriesModal">
+              🏷️ Catégories <span class="badge badge-sm">{{ boutique?.categories?.length || 0 }}</span>
+            </button>
             <button class="btn btn-secondary btn-sm" @click="openShoppingListModal" :disabled="!boutique?.magasins?.length">
               🛒 Créer une liste de course
             </button>
@@ -186,6 +189,15 @@
               </option>
             </select>
           </div>
+          <div class="form-control sm:col-span-2">
+            <label class="label py-1"><span class="label-text">Catégorie</span></label>
+            <select v-model.number="shoppingForm.categoryId" class="select select-bordered">
+              <option :value="null">— Aucune —</option>
+              <option v-for="c in boutique?.categories" :key="c.id" :value="c.id">
+                {{ c.emoji }} {{ c.name }}
+              </option>
+            </select>
+          </div>
         </div>
 
         <div v-if="shoppingError" class="alert alert-error mb-3 py-2">{{ shoppingError }}</div>
@@ -216,7 +228,10 @@
                     <span class="font-medium">{{ entry.name }}</span>
                     <span class="opacity-70"> × {{ entry.quantity }}</span>
                   </span>
-                  <span class="opacity-60 text-xs">{{ magasinLabel(entry.magasinId) }}</span>
+                  <span class="opacity-60 text-xs text-right">
+                    <span>{{ magasinLabel(entry.magasinId) }}</span>
+                    <span v-if="entry.categoryId" class="block">{{ categoryLabel(entry.categoryId) }}</span>
+                  </span>
                 </div>
                 <div class="flex gap-1 mt-1 justify-end">
                   <button class="btn btn-xs btn-ghost" @click="startEditShoppingEntry(i)">Modifier</button>
@@ -240,6 +255,12 @@
                   <select v-model.number="editShoppingForm.magasinId" class="select select-bordered select-sm">
                     <option v-for="m in boutique?.magasins" :key="m.id" :value="m.id">
                       {{ m.emoji }} {{ m.name }}
+                    </option>
+                  </select>
+                  <select v-model.number="editShoppingForm.categoryId" class="select select-bordered select-sm sm:col-span-2">
+                    <option :value="null">— Sans catégorie —</option>
+                    <option v-for="c in boutique?.categories" :key="c.id" :value="c.id">
+                      {{ c.emoji }} {{ c.name }}
                     </option>
                   </select>
                 </div>
@@ -267,6 +288,109 @@
         <button @click="closeShoppingListModal">close</button>
       </form>
     </dialog>
+
+    <!-- Modal catégories -->
+    <dialog :class="['modal', { 'modal-open': showCategoriesModal }]">
+      <div class="modal-box max-w-lg">
+        <h3 class="font-bold text-lg mb-4">🏷️ Catégories</h3>
+
+        <div v-if="!boutique?.categories?.length" class="text-center py-4 opacity-70">
+          Aucune catégorie pour l'instant.
+        </div>
+
+        <ul v-else class="space-y-2 mb-4 max-h-72 overflow-y-auto">
+          <li
+            v-for="cat in boutique.categories"
+            :key="cat.id"
+            class="border border-base-300 rounded p-2"
+          >
+            <template v-if="editingCategoryId !== cat.id">
+              <div class="flex items-center justify-between gap-2">
+                <span>
+                  <span class="text-xl mr-2">{{ cat.emoji }}</span>
+                  <span class="font-medium">{{ cat.name }}</span>
+                </span>
+                <div class="flex gap-1">
+                  <button class="btn btn-xs btn-ghost" @click="startEditCategory(cat)">Modifier</button>
+                  <button class="btn btn-xs btn-error btn-outline" @click="deleteCategory(cat)">Supprimer</button>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="space-y-2">
+                <div class="flex gap-2 items-center">
+                  <span class="text-2xl w-10 text-center">{{ editCategoryForm.emoji }}</span>
+                  <input
+                    type="text"
+                    v-model="editCategoryForm.name"
+                    class="input input-bordered input-sm flex-1"
+                    placeholder="Nom"
+                  />
+                </div>
+                <div class="flex flex-wrap gap-1">
+                  <button
+                    v-for="e in categoryEmojiOptions"
+                    :key="e"
+                    type="button"
+                    class="btn btn-xs"
+                    :class="{ 'btn-primary': editCategoryForm.emoji === e, 'btn-ghost': editCategoryForm.emoji !== e }"
+                    @click="editCategoryForm.emoji = e"
+                  >{{ e }}</button>
+                </div>
+                <div class="flex gap-1 justify-end">
+                  <button class="btn btn-xs btn-ghost" @click="cancelEditCategory">Annuler</button>
+                  <button
+                    class="btn btn-xs btn-primary"
+                    @click="saveEditCategory"
+                    :disabled="!editCategoryForm.name.trim()"
+                  >Enregistrer</button>
+                </div>
+              </div>
+            </template>
+          </li>
+        </ul>
+
+        <div class="divider">Ajouter une catégorie</div>
+
+        <div class="space-y-2 mb-3">
+          <div class="flex gap-2 items-center">
+            <span class="text-2xl w-10 text-center">{{ newCategory.emoji }}</span>
+            <input
+              type="text"
+              v-model="newCategory.name"
+              class="input input-bordered input-sm flex-1"
+              placeholder="Ex: Frais, Surgelés, Hygiène..."
+              @keyup.enter="addCategory"
+            />
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <button
+              v-for="e in categoryEmojiOptions"
+              :key="e"
+              type="button"
+              class="btn btn-xs"
+              :class="{ 'btn-primary': newCategory.emoji === e, 'btn-ghost': newCategory.emoji !== e }"
+              @click="newCategory.emoji = e"
+            >{{ e }}</button>
+          </div>
+          <button
+            class="btn btn-primary btn-sm w-full"
+            @click="addCategory"
+            :disabled="isAddingCategory || !newCategory.name.trim()"
+          >
+            <span v-if="isAddingCategory" class="loading loading-spinner loading-xs"></span>
+            Ajouter
+          </button>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="closeCategoriesModal">Fermer</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="closeCategoriesModal">close</button>
+      </form>
+    </dialog>
   </main>
 </template>
 
@@ -281,11 +405,19 @@ interface Magasin {
   shoppingCount?: number
 }
 
+interface Category {
+  id: number
+  name: string
+  emoji: string
+  position: number
+}
+
 interface Boutique {
   id: number
   name: string
   code: string
   magasins: Magasin[]
+  categories: Category[]
 }
 
 const route = useRoute()
@@ -305,7 +437,15 @@ const emojiOptions = ['🛒', '🏪', '🥖', '💊', '🥩', '🧀', '🍷', '�
 
 // Modal liste de course
 const showShoppingModal = ref(false)
-const shoppingForm = ref({ name: '', quantity: 1, magasinId: 0 })
+const shoppingForm = ref({ name: '', quantity: 1, magasinId: 0, categoryId: null as number | null })
+
+// Modal catégories
+const showCategoriesModal = ref(false)
+const newCategory = ref({ name: '', emoji: '🏷️' })
+const isAddingCategory = ref(false)
+const editingCategoryId = ref<number | null>(null)
+const editCategoryForm = ref({ name: '', emoji: '🏷️' })
+const categoryEmojiOptions = ['🥬', '🧊', '🍝', '🍪', '🥖', '☕', '🥤', '🍷', '🧴', '🧽', '💊', '🐾', '🧸', '🔧', '🏷️', '🥩', '🧀', '🌿', '🍎']
 const shoppingSuggestions = ref<{ name: string; magasinId: number }[]>([])
 interface ShoppingEntry {
   itemId: number
@@ -313,10 +453,11 @@ interface ShoppingEntry {
   name: string
   quantity: number
   created: boolean
+  categoryId?: number | null
 }
 const shoppingAdded = ref<ShoppingEntry[]>([])
 const editingShoppingIndex = ref<number | null>(null)
-const editShoppingForm = ref<{ name: string; quantity: number; magasinId: number }>({ name: '', quantity: 1, magasinId: 0 })
+const editShoppingForm = ref<{ name: string; quantity: number; magasinId: number; categoryId: number | null }>({ name: '', quantity: 1, magasinId: 0, categoryId: null })
 const isEditingShopping = ref(false)
 const shoppingError = ref('')
 const isShoppingAdding = ref(false)
@@ -387,12 +528,82 @@ function openShoppingListModal() {
   shoppingForm.value = {
     name: '',
     quantity: 1,
-    magasinId: boutique.value.magasins[0].id
+    magasinId: boutique.value.magasins[0].id,
+    categoryId: null
   }
   shoppingAdded.value = []
   shoppingSuggestions.value = []
   shoppingError.value = ''
   showShoppingModal.value = true
+}
+
+// === Catégories CRUD ===
+function openCategoriesModal() {
+  newCategory.value = { name: '', emoji: '🏷️' }
+  editingCategoryId.value = null
+  showCategoriesModal.value = true
+}
+
+function closeCategoriesModal() {
+  showCategoriesModal.value = false
+  editingCategoryId.value = null
+}
+
+async function addCategory() {
+  if (!newCategory.value.name.trim()) return
+  isAddingCategory.value = true
+  try {
+    await $fetch(`/api/boutique/${code}/categories/add`, {
+      method: 'POST',
+      body: { name: newCategory.value.name.trim(), emoji: newCategory.value.emoji }
+    })
+    newCategory.value = { name: '', emoji: '🏷️' }
+    await loadBoutique()
+  } catch (e: any) {
+    alert(e.data?.message || 'Erreur')
+  } finally {
+    isAddingCategory.value = false
+  }
+}
+
+function startEditCategory(cat: Category) {
+  editingCategoryId.value = cat.id
+  editCategoryForm.value = { name: cat.name, emoji: cat.emoji }
+}
+
+function cancelEditCategory() {
+  editingCategoryId.value = null
+}
+
+async function saveEditCategory() {
+  if (editingCategoryId.value == null) return
+  if (!editCategoryForm.value.name.trim()) return
+  try {
+    await $fetch(`/api/boutique/${code}/categories/${editingCategoryId.value}`, {
+      method: 'PUT',
+      body: { name: editCategoryForm.value.name.trim(), emoji: editCategoryForm.value.emoji }
+    })
+    editingCategoryId.value = null
+    await loadBoutique()
+  } catch (e: any) {
+    alert(e.data?.message || 'Erreur')
+  }
+}
+
+async function deleteCategory(cat: Category) {
+  if (!confirm(`Supprimer la catégorie "${cat.name}" ? Les articles associés perdront leur catégorie.`)) return
+  try {
+    await $fetch(`/api/boutique/${code}/categories/${cat.id}`, { method: 'DELETE' })
+    await loadBoutique()
+  } catch (e: any) {
+    alert(e.data?.message || 'Erreur')
+  }
+}
+
+function categoryLabel(categoryId: number | null | undefined): string {
+  if (!categoryId) return ''
+  const c = boutique.value?.categories?.find((x: Category) => x.id === categoryId)
+  return c ? `${c.emoji} ${c.name}` : ''
 }
 
 function closeShoppingListModal() {
@@ -402,16 +613,19 @@ function closeShoppingListModal() {
   }
 }
 
-type ItemSuggestion = { name: string; magasinId: number }
+type ItemSuggestion = { name: string; magasinId: number; categoryId: number | null }
 
-function onShoppingNameInput() {
-  // Si la valeur saisie correspond exactement à une suggestion connue,
-  // pré-sélectionne automatiquement son magasin.
+function applySuggestionMatch() {
   const current = shoppingForm.value.name.trim().toLowerCase()
   const match = shoppingSuggestions.value.find((s: ItemSuggestion) => s.name.toLowerCase() === current)
   if (match) {
     shoppingForm.value.magasinId = match.magasinId
+    if (match.categoryId) shoppingForm.value.categoryId = match.categoryId
   }
+}
+
+function onShoppingNameInput() {
+  applySuggestionMatch()
 
   if (suggestionsTimer) clearTimeout(suggestionsTimer)
   const term = shoppingForm.value.name.trim()
@@ -424,10 +638,7 @@ function onShoppingNameInput() {
       shoppingSuggestions.value = await $fetch(
         `/api/boutique/${code}/items?search=${encodeURIComponent(term)}`
       ) as ItemSuggestion[]
-      // Re-vérifie après réception (cas où l'utilisateur a fini de taper avant la réponse)
-      const cur = shoppingForm.value.name.trim().toLowerCase()
-      const m = shoppingSuggestions.value.find((s: ItemSuggestion) => s.name.toLowerCase() === cur)
-      if (m) shoppingForm.value.magasinId = m.magasinId
+      applySuggestionMatch()
     } catch {
       shoppingSuggestions.value = []
     }
@@ -445,7 +656,8 @@ function startEditShoppingEntry(index: number) {
   editShoppingForm.value = {
     name: entry.name,
     quantity: entry.quantity,
-    magasinId: entry.magasinId
+    magasinId: entry.magasinId,
+    categoryId: entry.categoryId ?? null
   }
   editingShoppingIndex.value = index
 }
@@ -475,15 +687,21 @@ async function saveEditShoppingEntry() {
     // Re-applique avec les nouvelles valeurs
     const res = await $fetch(`/api/boutique/${code}/shopping-list/add`, {
       method: 'POST',
-      body: { magasinId: newMagasinId, name: newName, quantity: newQuantity }
-    }) as { item: { id: number; name: string; magasinId: number }; created: boolean }
+      body: {
+        magasinId: newMagasinId,
+        name: newName,
+        quantity: newQuantity,
+        categoryId: editShoppingForm.value.categoryId
+      }
+    }) as { item: { id: number; name: string; magasinId: number; categoryId: number | null }; created: boolean }
 
     shoppingAdded.value[idx] = {
       itemId: res.item.id,
       magasinId: res.item.magasinId,
       name: res.item.name,
       quantity: newQuantity,
-      created: res.created
+      created: res.created,
+      categoryId: res.item.categoryId
     }
     editingShoppingIndex.value = null
   } catch (e: any) {
@@ -525,19 +743,22 @@ async function addToShoppingList() {
         body: {
           magasinId: shoppingForm.value.magasinId,
           name,
-          quantity: shoppingForm.value.quantity
+          quantity: shoppingForm.value.quantity,
+          categoryId: shoppingForm.value.categoryId
         }
       }
-    ) as { item: { id: number; name: string; magasinId: number }; created: boolean }
+    ) as { item: { id: number; name: string; magasinId: number; categoryId: number | null }; created: boolean }
     shoppingAdded.value.unshift({
       itemId: res.item.id,
       magasinId: res.item.magasinId,
       name: res.item.name,
       quantity: shoppingForm.value.quantity,
-      created: res.created
+      created: res.created,
+      categoryId: res.item.categoryId
     })
     shoppingForm.value.name = ''
     shoppingForm.value.quantity = 1
+    shoppingForm.value.categoryId = null
     shoppingSuggestions.value = []
     shoppingNameInput.value?.focus()
   } catch (e: any) {

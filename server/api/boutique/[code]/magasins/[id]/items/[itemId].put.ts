@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const magasinId = parseInt(getRouterParam(event, 'id') || '0')
   const itemId = parseInt(getRouterParam(event, 'itemId') || '0')
   const body = await readBody(event)
-  const { name, idealQuantity, currentQuantity } = body
+  const { name, idealQuantity, currentQuantity, categoryId } = body
 
   if (!code || !magasinId || !itemId) {
     throw createError({
@@ -59,6 +59,7 @@ export default defineEventHandler(async (event) => {
   if (name !== undefined) updateData.name = name.trim()
   if (idealQuantity !== undefined) updateData.idealQuantity = Math.max(1, idealQuantity)
   if (currentQuantity !== undefined) updateData.currentQuantity = Math.max(0, currentQuantity)
+  if (categoryId !== undefined) updateData.categoryId = categoryId === null ? null : parseInt(categoryId)
 
   const item = await prisma.item.update({
     where: { id: itemId },

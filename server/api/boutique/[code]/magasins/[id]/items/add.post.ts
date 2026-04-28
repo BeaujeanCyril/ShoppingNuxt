@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const code = getRouterParam(event, 'code')
   const magasinId = parseInt(getRouterParam(event, 'id') || '0')
   const body = await readBody(event)
-  const { name, idealQuantity } = body
+  const { name, idealQuantity, categoryId } = body
 
   if (!code || !magasinId) {
     throw createError({
@@ -51,7 +51,8 @@ export default defineEventHandler(async (event) => {
       name: name.trim(),
       idealQuantity: idealQuantity || 1,
       currentQuantity: 0,
-      magasinId
+      magasinId,
+      categoryId: categoryId ? parseInt(categoryId) : null
     }
   })
 

@@ -13,6 +13,7 @@ export default defineEventHandler(async (event) => {
   const magasinId = parseInt(body?.magasinId)
   const rawName = body?.name as string
   const quantity = parseInt(body?.quantity)
+  const categoryId = body?.categoryId ? parseInt(body.categoryId) : null
 
   if (!code || !magasinId || !rawName || !rawName.trim() || !quantity || quantity < 1) {
     throw createError({ statusCode: 400, message: 'Données invalides' })
@@ -46,7 +47,11 @@ export default defineEventHandler(async (event) => {
     const newCurrent = Math.max(0, existing.currentQuantity - quantity)
     const updated = await prisma.item.update({
       where: { id: existing.id },
-      data: { currentQuantity: newCurrent }
+      data: {
+        currentQuantity: newCurrent,
+        // Si on fournit une catégorie et que l'item n'en a pas, on la pose
+        ...(categoryId && !existing.categoryId ? { categoryId } : {})
+      }
     })
     return { item: updated, created: false }
   }
@@ -57,7 +62,8 @@ export default defineEventHandler(async (event) => {
       name,
       idealQuantity: quantity,
       currentQuantity: 0,
-      magasinId
+      magasinId,
+      categoryId
     }
   })
   return { item: created, created: true }
