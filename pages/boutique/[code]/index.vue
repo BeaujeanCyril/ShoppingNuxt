@@ -1,11 +1,28 @@
 <template>
   <main class="min-h-screen p-4 bg-base-100">
-    <header class="text-center mb-6">
-      <a href="https://cyriongames.fr" class="btn btn-ghost btn-sm mb-2">
-        <span class="mr-1">&#8592;</span> Portail
-      </a>
-      <h1 class="text-3xl font-bold text-primary">{{ boutique?.name || 'Chargement...' }}</h1>
-      <p class="opacity-70 mt-2">Gérez vos magasins et votre inventaire</p>
+    <header class="mb-6 max-w-4xl mx-auto">
+      <div class="flex items-center justify-between gap-2">
+        <a href="https://cyriongames.fr" class="btn btn-ghost btn-sm">
+          <span class="mr-1">&#8592;</span> Portail
+        </a>
+        <div v-if="boutique" class="dropdown dropdown-end">
+          <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square" title="Menu">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+          <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-xl">
+            <li>
+              <button @click="openCategoriesModal">
+                🏷️ Gérer les catégories
+                <span class="badge badge-sm">{{ boutique?.categories?.length || 0 }}</span>
+              </button>
+            </li>
+            <li>
+              <NuxtLink :to="`/boutique/${code}/articles`">📋 Tous les articles</NuxtLink>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <h1 class="text-3xl font-bold text-primary text-center mt-3">{{ boutique?.name || 'Chargement...' }}</h1>
     </header>
 
     <!-- Loading -->
@@ -25,72 +42,84 @@
 
     <!-- Content -->
     <div v-else class="max-w-4xl mx-auto">
-      <!-- Liste des magasins -->
-      <section class="mb-6">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-semibold">Mes magasins</h2>
-          <div class="flex gap-2 flex-wrap">
-            <NuxtLink :to="`/boutique/${code}/articles`" class="btn btn-outline btn-sm">
-              Tous les articles
-            </NuxtLink>
-            <button class="btn btn-accent btn-sm" @click="openCategoriesModal">
-              🏷️ Catégories <span class="badge badge-sm">{{ boutique?.categories?.length || 0 }}</span>
-            </button>
-            <button class="btn btn-secondary btn-sm" @click="openShoppingListModal" :disabled="!boutique?.magasins?.length">
-              🛒 Créer une liste de course
-            </button>
-            <button class="btn btn-primary btn-sm" @click="showAddModal = true">
-              + Ajouter
+
+      <!-- Onboarding : aucun magasin -->
+      <section v-if="!boutique?.magasins?.length" class="card bg-base-200 shadow-xl text-center">
+        <div class="card-body items-center py-10">
+          <p class="text-6xl mb-2">🏪</p>
+          <h2 class="card-title">Crée ton premier magasin</h2>
+          <p class="opacity-70 mb-4">Aucun magasin pour l'instant — démarre par en ajouter un.</p>
+          <button class="btn btn-primary btn-lg btn-circle" @click="showAddModal = true" title="Ajouter un magasin">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <template v-else>
+        <!-- Hero CTA : liste de courses -->
+        <section
+          class="card shadow-xl mb-6"
+          :class="totalShoppingItems > 0 ? 'bg-warning/20' : 'bg-base-200'"
+        >
+          <div class="card-body">
+            <div class="flex items-start gap-4 flex-wrap">
+              <span class="text-4xl">🛒</span>
+              <div class="flex-1 min-w-[200px]">
+                <h2 class="card-title">Liste de courses</h2>
+                <p v-if="totalShoppingItems > 0" class="opacity-90">
+                  <span class="font-bold">{{ totalShoppingItems }}</span> article{{ totalShoppingItems > 1 ? 's' : '' }} à acheter
+                  dans <span class="font-bold">{{ magasinsWithShopping }}</span> magasin{{ magasinsWithShopping > 1 ? 's' : '' }}.
+                </p>
+                <p v-else class="opacity-70">Tout est en stock. Ajoute des articles à racheter.</p>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <NuxtLink
+                  v-if="totalShoppingItems > 0"
+                  :to="`/boutique/${code}/articles?filterStatus=to-buy`"
+                  class="btn btn-ghost btn-sm"
+                >Voir détails</NuxtLink>
+                <button class="btn btn-primary btn-sm" @click="openShoppingListModal">
+                  + Créer une liste
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Liste des magasins -->
+        <section class="mb-6">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">Mes magasins</h2>
+            <button class="btn btn-primary btn-sm btn-square" @click="showAddModal = true" title="Ajouter un magasin">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             </button>
           </div>
-        </div>
 
-        <!-- Grille des magasins -->
-        <div v-if="boutique?.magasins?.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <NuxtLink
-            v-for="magasin in boutique.magasins"
-            :key="magasin.id"
-            :to="`/boutique/${code}/magasin/${magasin.id}`"
-            class="card bg-base-200 shadow-xl hover:shadow-2xl transition-shadow cursor-pointer"
-          >
-            <div class="card-body">
-              <div class="flex items-center gap-3">
-                <span class="text-4xl">{{ magasin.emoji }}</span>
-                <div class="flex-1">
-                  <h3 class="card-title text-lg">{{ magasin.name }}</h3>
-                  <div v-if="magasin.shoppingCount && magasin.shoppingCount > 0" class="badge badge-warning badge-sm mt-1">
-                    {{ magasin.shoppingCount }} article{{ magasin.shoppingCount > 1 ? 's' : '' }} à acheter
-                  </div>
-                  <div v-else class="badge badge-success badge-sm mt-1">
-                    Stock OK
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <NuxtLink
+              v-for="magasin in boutique.magasins"
+              :key="magasin.id"
+              :to="`/boutique/${code}/magasin/${magasin.id}`"
+              class="card bg-base-200 shadow-xl hover:shadow-2xl transition-shadow cursor-pointer"
+            >
+              <div class="card-body">
+                <div class="flex items-center gap-3">
+                  <span class="text-4xl">{{ magasin.emoji }}</span>
+                  <div class="flex-1">
+                    <h3 class="card-title text-lg">{{ magasin.name }}</h3>
+                    <div v-if="magasin.shoppingCount && magasin.shoppingCount > 0" class="badge badge-warning badge-sm mt-1">
+                      {{ magasin.shoppingCount }} article{{ magasin.shoppingCount > 1 ? 's' : '' }} à acheter
+                    </div>
+                    <div v-else class="badge badge-success badge-sm mt-1">
+                      Stock OK
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </NuxtLink>
-        </div>
-
-        <!-- Aucun magasin -->
-        <div v-else class="text-center py-12 opacity-70">
-          <p class="text-6xl mb-4">🏪</p>
-          <p>Aucun magasin pour l'instant</p>
-          <p class="text-sm">Ajoutez votre premier magasin pour commencer</p>
-        </div>
-      </section>
-
-      <!-- Résumé courses global -->
-      <section v-if="totalShoppingItems > 0" class="card bg-warning/20 shadow-xl">
-        <div class="card-body">
-          <h3 class="card-title">
-            <span class="text-2xl">🛒</span>
-            Liste de courses globale
-          </h3>
-          <p>
-            Vous avez <span class="font-bold">{{ totalShoppingItems }}</span> article{{ totalShoppingItems > 1 ? 's' : '' }} à acheter
-            dans <span class="font-bold">{{ magasinsWithShopping }}</span> magasin{{ magasinsWithShopping > 1 ? 's' : '' }}.
-          </p>
-        </div>
-      </section>
+            </NuxtLink>
+          </div>
+        </section>
+      </template>
     </div>
 
     <!-- Modal ajouter magasin -->
