@@ -170,46 +170,74 @@
         <section class="mb-6">
           <!-- Tab : courses (vue groupée à acheter) -->
           <div v-if="activeTab === 'courses'">
-            <h2 class="text-xl font-semibold mb-3">🛒 À acheter</h2>
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-xl font-semibold">🛒 À acheter</h2>
+              <button
+                v-if="magasinsAvecToBuy.length"
+                class="btn btn-ghost btn-xs"
+                @click="toggleAllCoursesCollapse"
+              >
+                {{ allCoursesCollapsed ? 'Tout ouvrir' : 'Tout fermer' }}
+              </button>
+            </div>
             <div v-if="!magasinsAvecToBuy.length" class="text-center py-10 opacity-70">
               <p class="text-5xl mb-2">✅</p>
               <p>Tout est en stock !</p>
               <p class="text-sm">Utilise la recherche ou le bouton "+" pour ajouter à la liste.</p>
             </div>
-            <div v-else class="space-y-4">
+            <div v-else class="space-y-3">
               <div
                 v-for="m in magasinsAvecToBuy"
                 :key="m.id"
                 class="card bg-base-200 shadow"
               >
-                <div class="card-body py-3 px-4">
-                  <div class="flex items-center justify-between mb-2">
-                    <h3 class="card-title text-base">
-                      <span class="text-2xl mr-1">{{ m.emoji }}</span>{{ m.name }}
-                    </h3>
+                <button
+                  type="button"
+                  class="w-full text-left py-3 px-4 flex items-center justify-between gap-2"
+                  :aria-expanded="!isCoursesCollapsed(m.id)"
+                  @click="toggleCoursesCollapse(m.id)"
+                >
+                  <span class="flex items-center gap-2 flex-1 min-w-0">
+                    <span class="text-2xl">{{ m.emoji }}</span>
+                    <span class="font-semibold truncate">{{ m.name }}</span>
                     <span class="badge badge-warning badge-sm">{{ m.toBuyItems.length }}</span>
-                  </div>
-                  <ul class="divide-y divide-base-300">
-                    <li
-                      v-for="item in m.toBuyItems"
-                      :key="item.id"
-                      class="flex items-center justify-between py-2 gap-2"
+                  </span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="transition-transform duration-150"
+                    :class="{ '-rotate-90': isCoursesCollapsed(m.id) }"
+                  >
+                    <path d="m6 9 6 6 6-6"/>
+                  </svg>
+                </button>
+                <ul v-if="!isCoursesCollapsed(m.id)" class="divide-y divide-base-300 px-4 pb-3">
+                  <li
+                    v-for="item in m.toBuyItems"
+                    :key="item.id"
+                    class="flex items-center justify-between py-2 gap-2"
+                  >
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium truncate">{{ item.name }}</div>
+                      <div v-if="item.categoryId" class="text-xs opacity-60 truncate">{{ categoryLabel(item.categoryId) }}</div>
+                    </div>
+                    <span class="badge badge-warning">{{ toBuyQty(item) }}</span>
+                    <button
+                      class="btn btn-success btn-sm btn-circle"
+                      title="Marquer comme acheté"
+                      @click="markBought(item)"
                     >
-                      <div class="flex-1 min-w-0">
-                        <div class="font-medium truncate">{{ item.name }}</div>
-                        <div v-if="item.categoryId" class="text-xs opacity-60 truncate">{{ categoryLabel(item.categoryId) }}</div>
-                      </div>
-                      <span class="badge badge-warning">{{ toBuyQty(item) }}</span>
-                      <button
-                        class="btn btn-success btn-sm btn-circle"
-                        title="Marquer comme acheté"
-                        @click="markBought(item)"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                      </button>
-                    </li>
-                  </ul>
-                </div>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                    </button>
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
@@ -683,7 +711,7 @@
     <!-- Bottom nav -->
     <nav
       v-if="boutique?.magasins?.length"
-      class="fixed bottom-0 left-0 right-0 bg-base-200 border-t border-base-300 z-20"
+      class="fixed bottom-0 left-0 right-0 bg-base-200 border-t border-base-300 z-20 shadow-[0_-2px_8px_rgba(0,0,0,0.08)]"
       style="padding-bottom: env(safe-area-inset-bottom);"
     >
       <div class="grid grid-cols-4 max-w-4xl mx-auto">
@@ -781,6 +809,31 @@ const bottomNavTabs: { id: TabId; emoji: string; label: string }[] = [
   { id: 'articles', emoji: '📋', label: 'Articles' },
   { id: 'categories', emoji: '🏷️', label: 'Catégories' }
 ]
+
+// Collapse par magasin sur l'onglet Courses
+const collapsedCourses = ref<Record<number, boolean>>({})
+
+function isCoursesCollapsed(magasinId: number): boolean {
+  return !!collapsedCourses.value[magasinId]
+}
+
+function toggleCoursesCollapse(magasinId: number) {
+  collapsedCourses.value[magasinId] = !collapsedCourses.value[magasinId]
+}
+
+const allCoursesCollapsed = computed(() =>
+  magasinsAvecToBuy.value.length > 0 &&
+  magasinsAvecToBuy.value.every((m: { id: number }) => collapsedCourses.value[m.id])
+)
+
+function toggleAllCoursesCollapse() {
+  const targetCollapse = !allCoursesCollapsed.value
+  const next: Record<number, boolean> = {}
+  for (const m of magasinsAvecToBuy.value) {
+    next[m.id] = targetCollapse
+  }
+  collapsedCourses.value = next
+}
 
 const magasinsAvecToBuy = computed(() => {
   if (!boutique.value?.magasins) return []
