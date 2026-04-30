@@ -69,8 +69,13 @@
           <div v-if="searchLoading" class="text-center py-4 opacity-60">
             <span class="loading loading-spinner loading-sm"></span>
           </div>
-          <div v-else-if="!searchResults.length" class="text-center py-4 opacity-60">
-            Aucun article trouvé pour "{{ searchQuery }}"
+          <div v-else-if="!searchResults.length" class="card bg-base-200 shadow">
+            <div class="card-body py-4 px-4 items-center text-center">
+              <p class="opacity-70">Aucun article trouvé pour "<span class="font-semibold">{{ searchQuery }}</span>"</p>
+              <button class="btn btn-primary btn-sm" @click="openShoppingListModalForNewItem(searchQuery)">
+                + Créer "{{ searchQuery.trim() }}"
+              </button>
+            </div>
           </div>
           <div
             v-else
@@ -665,6 +670,22 @@ function openShoppingListModalForItem(item: SearchResultItem) {
     quantity: 1,
     magasinId: item.magasinId,
     categoryId: item.categoryId
+  }
+  shoppingAdded.value = []
+  shoppingSuggestions.value = []
+  shoppingError.value = ''
+  showShoppingModal.value = true
+}
+
+function openShoppingListModalForNewItem(rawName: string) {
+  if (!boutique.value?.magasins?.length) return
+  const name = rawName.trim()
+  if (!name) return
+  shoppingForm.value = {
+    name,
+    quantity: 1,
+    magasinId: boutique.value.magasins[0].id,
+    categoryId: null
   }
   shoppingAdded.value = []
   shoppingSuggestions.value = []
