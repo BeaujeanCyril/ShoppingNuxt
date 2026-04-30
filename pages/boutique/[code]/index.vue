@@ -43,6 +43,82 @@
     <!-- Content -->
     <div v-else class="max-w-4xl mx-auto">
 
+      <!-- Recherche d'articles -->
+      <section v-if="boutique?.magasins?.length" class="mb-6">
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 opacity-60">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </span>
+          <input
+            type="text"
+            v-model="searchQuery"
+            class="input input-bordered w-full pl-10"
+            placeholder="Rechercher un article..."
+            @input="onSearchInput"
+          />
+          <button
+            v-if="searchQuery"
+            class="btn btn-ghost btn-sm btn-square absolute right-1 top-1/2 -translate-y-1/2"
+            @click="clearSearch"
+            title="Effacer"
+          >✕</button>
+        </div>
+
+        <!-- Résultats -->
+        <div v-if="searchQuery && searchQuery.trim().length >= 2" class="mt-3 space-y-2">
+          <div v-if="searchLoading" class="text-center py-4 opacity-60">
+            <span class="loading loading-spinner loading-sm"></span>
+          </div>
+          <div v-else-if="!searchResults.length" class="text-center py-4 opacity-60">
+            Aucun article trouvé pour "{{ searchQuery }}"
+          </div>
+          <div
+            v-else
+            v-for="item in searchResults"
+            :key="item.id"
+            class="card bg-base-200 shadow"
+          >
+            <div class="card-body py-3 px-4">
+              <div class="flex items-center gap-3 flex-wrap">
+                <div class="flex-1 min-w-[180px]">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h3 class="font-semibold">{{ item.name }}</h3>
+                    <span v-if="item.category" class="badge badge-sm badge-outline">
+                      {{ item.category.emoji }} {{ item.category.name }}
+                    </span>
+                  </div>
+                  <div class="text-sm opacity-70 mt-1">
+                    <span>{{ item.magasin.emoji }} {{ item.magasin.name }}</span>
+                    <span class="mx-2">•</span>
+                    <span :class="item.currentQuantity < item.idealQuantity ? 'text-warning font-semibold' : 'text-success'">
+                      Stock {{ item.currentQuantity }} / {{ item.idealQuantity }}
+                    </span>
+                    <span v-if="item.currentQuantity < item.idealQuantity" class="opacity-80">
+                      (manque {{ item.idealQuantity - item.currentQuantity }})
+                    </span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="join">
+                    <span class="join-item btn btn-sm btn-ghost no-animation cursor-default">QI</span>
+                    <input
+                      type="number"
+                      min="1"
+                      :value="item.idealQuantity"
+                      class="input input-bordered input-sm w-16 join-item"
+                      @change="onIdealQuantityChange(item, $event)"
+                    />
+                  </div>
+                  <button class="btn btn-primary btn-sm" @click="openShoppingListModalForItem(item)">
+                    + Liste
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Onboarding : aucun magasin -->
       <section v-if="!boutique?.magasins?.length" class="card bg-base-200 shadow-xl text-center">
         <div class="card-body items-center py-10">
@@ -464,6 +540,22 @@ const addError = ref('')
 
 const emojiOptions = ['🛒', '🏪', '🥖', '💊', '🥩', '🧀', '🍷', '🌿', '🔧', '👕', '📚', '🎮']
 
+// Recherche d'articles
+interface SearchResultItem {
+  id: number
+  name: string
+  idealQuantity: number
+  currentQuantity: number
+  magasinId: number
+  categoryId: number | null
+  magasin: { id: number; name: string; emoji: string }
+  category: { id: number; name: string; emoji: string } | null
+}
+const searchQuery = ref('')
+const searchResults = ref<SearchResultItem[]>([])
+const searchLoading = ref(false)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+
 // Modal liste de course
 const showShoppingModal = ref(false)
 const shoppingForm = ref({ name: '', quantity: 1, magasinId: 0, categoryId: null as number | null })
@@ -564,6 +656,75 @@ function openShoppingListModal() {
   shoppingSuggestions.value = []
   shoppingError.value = ''
   showShoppingModal.value = true
+}
+
+function openShoppingListModalForItem(item: SearchResultItem) {
+  if (!boutique.value?.magasins?.length) return
+  shoppingForm.value = {
+    name: item.name,
+    quantity: 1,
+    magasinId: item.magasinId,
+    categoryId: item.categoryId
+  }
+  shoppingAdded.value = []
+  shoppingSuggestions.value = []
+  shoppingError.value = ''
+  showShoppingModal.value = true
+}
+
+// === Recherche ===
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer)
+  const term = searchQuery.value.trim()
+  if (term.length < 2) {
+    searchResults.value = []
+    return
+  }
+  searchLoading.value = true
+  searchTimer = setTimeout(async () => {
+    try {
+      searchResults.value = await $fetch(
+        `/api/boutique/${code}/items/search?q=${encodeURIComponent(term)}`
+      ) as SearchResultItem[]
+    } catch {
+      searchResults.value = []
+    } finally {
+      searchLoading.value = false
+    }
+  }, 250)
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  searchResults.value = []
+  if (searchTimer) clearTimeout(searchTimer)
+}
+
+async function onIdealQuantityChange(item: SearchResultItem, event: Event) {
+  const input = event.target as HTMLInputElement
+  const newQty = parseInt(input.value)
+  if (!newQty || newQty < 1) {
+    input.value = String(item.idealQuantity)
+    return
+  }
+  if (newQty === item.idealQuantity) return
+
+  try {
+    const updated = await $fetch(
+      `/api/boutique/${code}/magasins/${item.magasinId}/items/${item.id}`,
+      {
+        method: 'PUT',
+        body: { idealQuantity: newQty }
+      }
+    ) as { idealQuantity: number; currentQuantity: number }
+    item.idealQuantity = updated.idealQuantity
+    item.currentQuantity = updated.currentQuantity
+    // Refresh boutique-level data (shopping counts on magasin cards)
+    loadBoutique()
+  } catch (e: any) {
+    alert(e.data?.message || 'Erreur')
+    input.value = String(item.idealQuantity)
+  }
 }
 
 // === Catégories CRUD ===
