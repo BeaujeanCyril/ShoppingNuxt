@@ -1,10 +1,10 @@
 <template>
-  <main class="min-h-screen p-4 bg-base-100">
+  <main class="min-h-screen p-4 pb-24 bg-base-100">
     <header class="mb-6 max-w-4xl mx-auto">
       <a href="https://cyriongames.fr" class="btn btn-ghost btn-sm">
         <span class="mr-1">&#8592;</span> Portail
       </a>
-      <h1 class="text-3xl font-bold text-primary text-center mt-3">{{ boutique?.name || 'Chargement...' }}</h1>
+      <h1 class="text-2xl sm:text-3xl font-bold text-primary text-center mt-3">{{ boutique?.name || 'Chargement...' }}</h1>
     </header>
 
     <!-- Loading -->
@@ -166,61 +166,56 @@
           </div>
         </section>
 
-        <!-- Hero CTA : liste de courses -->
-        <section
-          class="card shadow-xl mb-6"
-          :class="totalShoppingItems > 0 ? 'bg-warning/20' : 'bg-base-200'"
-        >
-          <div class="card-body">
-            <div class="flex items-start gap-4 flex-wrap">
-              <span class="text-4xl">🛒</span>
-              <div class="flex-1 min-w-[200px]">
-                <h2 class="card-title">Liste de courses</h2>
-                <p v-if="totalShoppingItems > 0" class="opacity-90">
-                  <span class="font-bold">{{ totalShoppingItems }}</span> article{{ totalShoppingItems > 1 ? 's' : '' }} à acheter
-                  dans <span class="font-bold">{{ magasinsWithShopping }}</span> magasin{{ magasinsWithShopping > 1 ? 's' : '' }}.
-                </p>
-                <p v-else class="opacity-70">Tout est en stock. Ajoute des articles à racheter.</p>
-              </div>
-              <div class="flex gap-2 flex-wrap">
-                <button
-                  v-if="totalShoppingItems > 0"
-                  class="btn btn-ghost btn-sm"
-                  @click="showArticlesTab('to-buy')"
-                >Voir détails</button>
-                <button class="btn btn-primary btn-sm" @click="openShoppingListModal">
-                  + Créer une liste
-                </button>
+        <!-- Sections (navigation via bottom nav) -->
+        <section class="mb-6">
+          <!-- Tab : courses (vue groupée à acheter) -->
+          <div v-if="activeTab === 'courses'">
+            <h2 class="text-xl font-semibold mb-3">🛒 À acheter</h2>
+            <div v-if="!magasinsAvecToBuy.length" class="text-center py-10 opacity-70">
+              <p class="text-5xl mb-2">✅</p>
+              <p>Tout est en stock !</p>
+              <p class="text-sm">Utilise la recherche ou le bouton "+" pour ajouter à la liste.</p>
+            </div>
+            <div v-else class="space-y-4">
+              <div
+                v-for="m in magasinsAvecToBuy"
+                :key="m.id"
+                class="card bg-base-200 shadow"
+              >
+                <div class="card-body py-3 px-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="card-title text-base">
+                      <span class="text-2xl mr-1">{{ m.emoji }}</span>{{ m.name }}
+                    </h3>
+                    <span class="badge badge-warning badge-sm">{{ m.toBuyItems.length }}</span>
+                  </div>
+                  <ul class="divide-y divide-base-300">
+                    <li
+                      v-for="item in m.toBuyItems"
+                      :key="item.id"
+                      class="flex items-center justify-between py-2 gap-2"
+                    >
+                      <div class="flex-1 min-w-0">
+                        <div class="font-medium truncate">{{ item.name }}</div>
+                        <div v-if="item.categoryId" class="text-xs opacity-60 truncate">{{ categoryLabel(item.categoryId) }}</div>
+                      </div>
+                      <span class="badge badge-warning">{{ toBuyQty(item) }}</span>
+                      <button
+                        class="btn btn-success btn-sm btn-circle"
+                        title="Marquer comme acheté"
+                        @click="markBought(item)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
-        </section>
-
-        <!-- Tabs : magasins / articles -->
-        <section class="mb-6">
-          <div role="tablist" class="tabs tabs-boxed mb-4 justify-center">
-            <button
-              role="tab"
-              class="tab"
-              :class="{ 'tab-active': activeTab === 'magasins' }"
-              @click="activeTab = 'magasins'"
-            >🏪 Mes magasins</button>
-            <button
-              role="tab"
-              class="tab"
-              :class="{ 'tab-active': activeTab === 'articles' }"
-              @click="activeTab = 'articles'"
-            >📋 Mes articles</button>
-            <button
-              role="tab"
-              class="tab"
-              :class="{ 'tab-active': activeTab === 'categories' }"
-              @click="activeTab = 'categories'"
-            >🏷️ Mes catégories</button>
-          </div>
 
           <!-- Tab : magasins -->
-          <div v-if="activeTab === 'magasins'">
+          <div v-else-if="activeTab === 'magasins'">
             <div class="flex justify-between items-center mb-4">
               <h2 class="text-xl font-semibold">Mes magasins</h2>
               <button class="btn btn-primary btn-sm btn-square" @click="showAddModal = true" title="Ajouter un magasin">
@@ -290,7 +285,44 @@
               </div>
             </div>
 
-            <div v-if="filteredArticles.length" class="overflow-x-auto">
+            <!-- Cards sur mobile -->
+            <div v-if="filteredArticles.length" class="md:hidden space-y-2">
+              <div
+                v-for="item in filteredArticles"
+                :key="item.id"
+                class="card bg-base-200 shadow-sm"
+              >
+                <div class="card-body py-2 px-3">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium truncate">{{ item.name }}</div>
+                      <div class="text-xs opacity-60 truncate">
+                        <NuxtLink :to="`/boutique/${code}/magasin/${item.magasinId}`" class="link link-hover">
+                          {{ item.magasinEmoji }} {{ item.magasinName }}
+                        </NuxtLink>
+                        <span v-if="item.categoryId" class="ml-1">• {{ categoryLabel(item.categoryId) }}</span>
+                      </div>
+                    </div>
+                    <div class="text-right text-xs">
+                      <div>
+                        <span :class="item.currentQuantity < item.idealQuantity ? 'text-warning font-bold' : ''">
+                          {{ item.currentQuantity }}
+                        </span>
+                        <span class="opacity-50"> / {{ item.idealQuantity }}</span>
+                        <span v-if="item.requestedQuantity > 0" class="badge badge-info badge-xs ml-1">+{{ item.requestedQuantity }}</span>
+                      </div>
+                      <span v-if="toBuyQty(item) > 0" class="badge badge-warning badge-sm mt-1">
+                        À acheter {{ toBuyQty(item) }}
+                      </span>
+                      <span v-else class="badge badge-success badge-sm mt-1">OK</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Table sur md+ -->
+            <div v-if="filteredArticles.length" class="hidden md:block overflow-x-auto">
               <table class="table table-zebra table-sm w-full">
                 <thead>
                   <tr>
@@ -339,7 +371,8 @@
                 </tbody>
               </table>
             </div>
-            <div v-else class="text-center py-8 opacity-70">
+
+            <div v-if="!filteredArticles.length" class="text-center py-8 opacity-70">
               <p class="text-4xl mb-2">📦</p>
               <p v-if="allItems.length === 0">Aucun article enregistré</p>
               <p v-else>Aucun article ne correspond aux filtres</p>
@@ -347,7 +380,7 @@
           </div>
 
           <!-- Tab : catégories -->
-          <div v-else>
+          <div v-else-if="activeTab === 'categories'">
             <div v-if="!boutique.categories?.length" class="text-center py-6 opacity-70">
               Aucune catégorie pour l'instant.
             </div>
@@ -636,6 +669,36 @@
         <button @click="closeShoppingListModal">close</button>
       </form>
     </dialog>
+
+    <!-- FAB ajouter à la liste de course -->
+    <button
+      v-if="boutique?.magasins?.length"
+      class="btn btn-primary btn-circle btn-lg shadow-2xl fixed right-4 bottom-20 z-30"
+      @click="openShoppingListModal"
+      title="Ajouter à la liste"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+    </button>
+
+    <!-- Bottom nav -->
+    <nav
+      v-if="boutique?.magasins?.length"
+      class="fixed bottom-0 left-0 right-0 bg-base-200 border-t border-base-300 z-20"
+      style="padding-bottom: env(safe-area-inset-bottom);"
+    >
+      <div class="grid grid-cols-4 max-w-4xl mx-auto">
+        <button
+          v-for="t in bottomNavTabs"
+          :key="t.id"
+          class="flex flex-col items-center gap-0.5 py-2 transition-colors"
+          :class="activeTab === t.id ? 'text-primary' : 'opacity-70'"
+          @click="activeTab = t.id"
+        >
+          <span class="text-xl">{{ t.emoji }}</span>
+          <span class="text-xs">{{ t.label }}</span>
+        </button>
+      </div>
+    </nav>
   </main>
 </template>
 
@@ -709,8 +772,57 @@ const addError = ref('')
 
 const emojiOptions = ['🛒', '🏪', '🥖', '💊', '🥩', '🧀', '🍷', '🌿', '🔧', '👕', '📚', '🎮']
 
-// Tabs
-const activeTab = ref<'magasins' | 'articles' | 'categories'>('magasins')
+// Tabs (bottom nav)
+type TabId = 'courses' | 'magasins' | 'articles' | 'categories'
+const activeTab = ref<TabId>('courses')
+const bottomNavTabs: { id: TabId; emoji: string; label: string }[] = [
+  { id: 'courses', emoji: '🛒', label: 'Courses' },
+  { id: 'magasins', emoji: '🏪', label: 'Magasins' },
+  { id: 'articles', emoji: '📋', label: 'Articles' },
+  { id: 'categories', emoji: '🏷️', label: 'Catégories' }
+]
+
+const magasinsAvecToBuy = computed(() => {
+  if (!boutique.value?.magasins) return []
+  return boutique.value.magasins
+    .map((m: Magasin) => {
+      const items = (m.items || []).filter((i: { idealQuantity: number; currentQuantity: number; requestedQuantity: number }) =>
+        Math.max(i.idealQuantity - i.currentQuantity, 0) + (i.requestedQuantity || 0) > 0
+      )
+      return {
+        id: m.id,
+        name: m.name,
+        emoji: m.emoji,
+        toBuyItems: items
+      }
+    })
+    .filter((x: { toBuyItems: unknown[] }) => x.toBuyItems.length > 0)
+})
+
+async function markBought(item: { id: number; magasinId?: number; idealQuantity: number; currentQuantity: number; requestedQuantity: number } & { magasinId?: number }) {
+  // Le item ici peut venir d'allItems (qui a magasinId) ou d'un magasin (où magasinId est implicite)
+  // Pour simplifier on cherche le magasin parent
+  let magasinId = (item as any).magasinId as number | undefined
+  if (!magasinId && boutique.value?.magasins) {
+    for (const m of boutique.value.magasins) {
+      if (m.items?.some((i: { id: number }) => i.id === item.id)) {
+        magasinId = m.id
+        break
+      }
+    }
+  }
+  if (!magasinId) return
+
+  try {
+    await $fetch(
+      `/api/boutique/${code}/magasins/${magasinId}/items/${item.id}/restock`,
+      { method: 'POST' }
+    )
+    await loadBoutique()
+  } catch (e: any) {
+    alert(e.data?.message || 'Erreur')
+  }
+}
 
 // Suggestions QI
 const qiSuggestions = ref<QiSuggestion[]>([])
@@ -821,12 +933,6 @@ function toggleArticlesSort(col: 'name' | 'stock' | 'magasin') {
   }
 }
 
-function showArticlesTab(filterStatus: '' | 'to-buy' | 'ok' = '') {
-  activeTab.value = 'articles'
-  articlesFilterStatus.value = filterStatus
-  articlesSearch.value = ''
-  articlesFilterMagasin.value = ''
-}
 
 // Recherche d'articles
 interface SearchResultItem {
