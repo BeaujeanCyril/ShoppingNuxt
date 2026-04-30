@@ -1,27 +1,9 @@
 <template>
   <main class="min-h-screen p-4 bg-base-100">
     <header class="mb-6 max-w-4xl mx-auto">
-      <div class="flex items-center justify-between gap-2">
-        <a href="https://cyriongames.fr" class="btn btn-ghost btn-sm">
-          <span class="mr-1">&#8592;</span> Portail
-        </a>
-        <div v-if="boutique" class="dropdown dropdown-end">
-          <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square" title="Menu">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </div>
-          <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-xl">
-            <li>
-              <button @click="openCategoriesModal">
-                🏷️ Gérer les catégories
-                <span class="badge badge-sm">{{ boutique?.categories?.length || 0 }}</span>
-              </button>
-            </li>
-            <li>
-              <NuxtLink :to="`/boutique/${code}/articles`">📋 Tous les articles</NuxtLink>
-            </li>
-          </ul>
-        </div>
-      </div>
+      <a href="https://cyriongames.fr" class="btn btn-ghost btn-sm">
+        <span class="mr-1">&#8592;</span> Portail
+      </a>
       <h1 class="text-3xl font-bold text-primary text-center mt-3">{{ boutique?.name || 'Chargement...' }}</h1>
     </header>
 
@@ -154,11 +136,11 @@
                 <p v-else class="opacity-70">Tout est en stock. Ajoute des articles à racheter.</p>
               </div>
               <div class="flex gap-2 flex-wrap">
-                <NuxtLink
+                <button
                   v-if="totalShoppingItems > 0"
-                  :to="`/boutique/${code}/articles?filterStatus=to-buy`"
                   class="btn btn-ghost btn-sm"
-                >Voir détails</NuxtLink>
+                  @click="showArticlesTab('to-buy')"
+                >Voir détails</button>
                 <button class="btn btn-primary btn-sm" @click="openShoppingListModal">
                   + Créer une liste
                 </button>
@@ -167,37 +149,243 @@
           </div>
         </section>
 
-        <!-- Liste des magasins -->
+        <!-- Tabs : magasins / articles -->
         <section class="mb-6">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold">Mes magasins</h2>
-            <button class="btn btn-primary btn-sm btn-square" @click="showAddModal = true" title="Ajouter un magasin">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-            </button>
+          <div role="tablist" class="tabs tabs-boxed mb-4 justify-center">
+            <button
+              role="tab"
+              class="tab"
+              :class="{ 'tab-active': activeTab === 'magasins' }"
+              @click="activeTab = 'magasins'"
+            >🏪 Mes magasins</button>
+            <button
+              role="tab"
+              class="tab"
+              :class="{ 'tab-active': activeTab === 'articles' }"
+              @click="activeTab = 'articles'"
+            >📋 Mes articles</button>
+            <button
+              role="tab"
+              class="tab"
+              :class="{ 'tab-active': activeTab === 'categories' }"
+              @click="activeTab = 'categories'"
+            >🏷️ Mes catégories</button>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <NuxtLink
-              v-for="magasin in boutique.magasins"
-              :key="magasin.id"
-              :to="`/boutique/${code}/magasin/${magasin.id}`"
-              class="card bg-base-200 shadow-xl hover:shadow-2xl transition-shadow cursor-pointer"
-            >
-              <div class="card-body">
-                <div class="flex items-center gap-3">
-                  <span class="text-4xl">{{ magasin.emoji }}</span>
-                  <div class="flex-1">
-                    <h3 class="card-title text-lg">{{ magasin.name }}</h3>
-                    <div v-if="magasin.shoppingCount && magasin.shoppingCount > 0" class="badge badge-warning badge-sm mt-1">
-                      {{ magasin.shoppingCount }} article{{ magasin.shoppingCount > 1 ? 's' : '' }} à acheter
-                    </div>
-                    <div v-else class="badge badge-success badge-sm mt-1">
-                      Stock OK
+          <!-- Tab : magasins -->
+          <div v-if="activeTab === 'magasins'">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-semibold">Mes magasins</h2>
+              <button class="btn btn-primary btn-sm btn-square" @click="showAddModal = true" title="Ajouter un magasin">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <NuxtLink
+                v-for="magasin in boutique.magasins"
+                :key="magasin.id"
+                :to="`/boutique/${code}/magasin/${magasin.id}`"
+                class="card bg-base-200 shadow-xl hover:shadow-2xl transition-shadow cursor-pointer"
+              >
+                <div class="card-body">
+                  <div class="flex items-center gap-3">
+                    <span class="text-4xl">{{ magasin.emoji }}</span>
+                    <div class="flex-1">
+                      <h3 class="card-title text-lg">{{ magasin.name }}</h3>
+                      <div v-if="magasin.shoppingCount && magasin.shoppingCount > 0" class="badge badge-warning badge-sm mt-1">
+                        {{ magasin.shoppingCount }} article{{ magasin.shoppingCount > 1 ? 's' : '' }} à acheter
+                      </div>
+                      <div v-else class="badge badge-success badge-sm mt-1">
+                        Stock OK
+                      </div>
                     </div>
                   </div>
                 </div>
+              </NuxtLink>
+            </div>
+          </div>
+
+          <!-- Tab : articles -->
+          <div v-else-if="activeTab === 'articles'">
+            <div class="flex flex-col sm:flex-row gap-2 mb-3">
+              <input
+                type="text"
+                v-model="articlesSearch"
+                class="input input-bordered input-sm flex-1"
+                placeholder="Filtrer par nom..."
+              />
+              <select v-model="articlesFilterMagasin" class="select select-bordered select-sm">
+                <option :value="''">Tous les magasins</option>
+                <option v-for="m in boutique.magasins" :key="m.id" :value="m.id">
+                  {{ m.emoji }} {{ m.name }}
+                </option>
+              </select>
+              <select v-model="articlesFilterStatus" class="select select-bordered select-sm">
+                <option value="">Tous</option>
+                <option value="to-buy">À acheter</option>
+                <option value="ok">Stock OK</option>
+              </select>
+            </div>
+
+            <div class="stats stats-horizontal shadow w-full mb-3 text-sm">
+              <div class="stat py-2">
+                <div class="stat-title text-xs">Total</div>
+                <div class="stat-value text-base">{{ allItems.length }}</div>
               </div>
-            </NuxtLink>
+              <div class="stat py-2">
+                <div class="stat-title text-xs">À acheter</div>
+                <div class="stat-value text-base text-warning">{{ itemsToBuyCount }}</div>
+              </div>
+              <div class="stat py-2">
+                <div class="stat-title text-xs">Stock OK</div>
+                <div class="stat-value text-base text-success">{{ allItems.length - itemsToBuyCount }}</div>
+              </div>
+            </div>
+
+            <div v-if="filteredArticles.length" class="overflow-x-auto">
+              <table class="table table-zebra table-sm w-full">
+                <thead>
+                  <tr>
+                    <th class="cursor-pointer" @click="toggleArticlesSort('name')">
+                      Article
+                      <span v-if="articlesSortBy === 'name'">{{ articlesSortDir === 'asc' ? '▲' : '▼' }}</span>
+                    </th>
+                    <th class="cursor-pointer text-center" @click="toggleArticlesSort('stock')">
+                      Stock
+                      <span v-if="articlesSortBy === 'stock'">{{ articlesSortDir === 'asc' ? '▲' : '▼' }}</span>
+                    </th>
+                    <th class="cursor-pointer" @click="toggleArticlesSort('magasin')">
+                      Magasin
+                      <span v-if="articlesSortBy === 'magasin'">{{ articlesSortDir === 'asc' ? '▲' : '▼' }}</span>
+                    </th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in filteredArticles" :key="item.id">
+                    <td>
+                      <div class="font-medium">{{ item.name }}</div>
+                      <div v-if="item.categoryId" class="text-xs opacity-60">{{ categoryLabel(item.categoryId) }}</div>
+                    </td>
+                    <td class="text-center">
+                      <span :class="item.currentQuantity < item.idealQuantity ? 'text-warning font-bold' : ''">
+                        {{ item.currentQuantity }}
+                      </span>
+                      <span class="opacity-50"> / {{ item.idealQuantity }}</span>
+                    </td>
+                    <td>
+                      <NuxtLink :to="`/boutique/${code}/magasin/${item.magasinId}`" class="link link-hover">
+                        {{ item.magasinEmoji }} {{ item.magasinName }}
+                      </NuxtLink>
+                    </td>
+                    <td>
+                      <span v-if="item.currentQuantity < item.idealQuantity" class="badge badge-warning badge-sm">
+                        À acheter ({{ item.idealQuantity - item.currentQuantity }})
+                      </span>
+                      <span v-else class="badge badge-success badge-sm">OK</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="text-center py-8 opacity-70">
+              <p class="text-4xl mb-2">📦</p>
+              <p v-if="allItems.length === 0">Aucun article enregistré</p>
+              <p v-else>Aucun article ne correspond aux filtres</p>
+            </div>
+          </div>
+
+          <!-- Tab : catégories -->
+          <div v-else>
+            <div v-if="!boutique.categories?.length" class="text-center py-6 opacity-70">
+              Aucune catégorie pour l'instant.
+            </div>
+
+            <ul v-else class="space-y-2 mb-4">
+              <li
+                v-for="cat in boutique.categories"
+                :key="cat.id"
+                class="border border-base-300 rounded p-2 bg-base-100"
+              >
+                <template v-if="editingCategoryId !== cat.id">
+                  <div class="flex items-center justify-between gap-2">
+                    <span>
+                      <span class="text-xl mr-2">{{ cat.emoji }}</span>
+                      <span class="font-medium">{{ cat.name }}</span>
+                    </span>
+                    <div class="flex gap-1">
+                      <button class="btn btn-xs btn-ghost" @click="startEditCategory(cat)">Modifier</button>
+                      <button class="btn btn-xs btn-error btn-outline" @click="deleteCategory(cat)">Supprimer</button>
+                    </div>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="space-y-2">
+                    <div class="flex gap-2 items-center">
+                      <span class="text-2xl w-10 text-center">{{ editCategoryForm.emoji }}</span>
+                      <input
+                        type="text"
+                        v-model="editCategoryForm.name"
+                        class="input input-bordered input-sm flex-1"
+                        placeholder="Nom"
+                      />
+                    </div>
+                    <div class="flex flex-wrap gap-1">
+                      <button
+                        v-for="e in categoryEmojiOptions"
+                        :key="e"
+                        type="button"
+                        class="btn btn-xs"
+                        :class="{ 'btn-primary': editCategoryForm.emoji === e, 'btn-ghost': editCategoryForm.emoji !== e }"
+                        @click="editCategoryForm.emoji = e"
+                      >{{ e }}</button>
+                    </div>
+                    <div class="flex gap-1 justify-end">
+                      <button class="btn btn-xs btn-ghost" @click="cancelEditCategory">Annuler</button>
+                      <button
+                        class="btn btn-xs btn-primary"
+                        @click="saveEditCategory"
+                        :disabled="!editCategoryForm.name.trim()"
+                      >Enregistrer</button>
+                    </div>
+                  </div>
+                </template>
+              </li>
+            </ul>
+
+            <div class="divider">Ajouter une catégorie</div>
+
+            <div class="space-y-2">
+              <div class="flex gap-2 items-center">
+                <span class="text-2xl w-10 text-center">{{ newCategory.emoji }}</span>
+                <input
+                  type="text"
+                  v-model="newCategory.name"
+                  class="input input-bordered input-sm flex-1"
+                  placeholder="Ex: Frais, Surgelés, Hygiène..."
+                  @keyup.enter="addCategory"
+                />
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <button
+                  v-for="e in categoryEmojiOptions"
+                  :key="e"
+                  type="button"
+                  class="btn btn-xs"
+                  :class="{ 'btn-primary': newCategory.emoji === e, 'btn-ghost': newCategory.emoji !== e }"
+                  @click="newCategory.emoji = e"
+                >{{ e }}</button>
+              </div>
+              <button
+                class="btn btn-primary btn-sm w-full"
+                @click="addCategory"
+                :disabled="isAddingCategory || !newCategory.name.trim()"
+              >
+                <span v-if="isAddingCategory" class="loading loading-spinner loading-xs"></span>
+                Ajouter
+              </button>
+            </div>
           </div>
         </section>
       </template>
@@ -398,109 +586,6 @@
         <button @click="closeShoppingListModal">close</button>
       </form>
     </dialog>
-
-    <!-- Modal catégories -->
-    <dialog :class="['modal', { 'modal-open': showCategoriesModal }]">
-      <div class="modal-box max-w-lg">
-        <h3 class="font-bold text-lg mb-4">🏷️ Catégories</h3>
-
-        <div v-if="!boutique?.categories?.length" class="text-center py-4 opacity-70">
-          Aucune catégorie pour l'instant.
-        </div>
-
-        <ul v-else class="space-y-2 mb-4 max-h-72 overflow-y-auto">
-          <li
-            v-for="cat in boutique.categories"
-            :key="cat.id"
-            class="border border-base-300 rounded p-2"
-          >
-            <template v-if="editingCategoryId !== cat.id">
-              <div class="flex items-center justify-between gap-2">
-                <span>
-                  <span class="text-xl mr-2">{{ cat.emoji }}</span>
-                  <span class="font-medium">{{ cat.name }}</span>
-                </span>
-                <div class="flex gap-1">
-                  <button class="btn btn-xs btn-ghost" @click="startEditCategory(cat)">Modifier</button>
-                  <button class="btn btn-xs btn-error btn-outline" @click="deleteCategory(cat)">Supprimer</button>
-                </div>
-              </div>
-            </template>
-            <template v-else>
-              <div class="space-y-2">
-                <div class="flex gap-2 items-center">
-                  <span class="text-2xl w-10 text-center">{{ editCategoryForm.emoji }}</span>
-                  <input
-                    type="text"
-                    v-model="editCategoryForm.name"
-                    class="input input-bordered input-sm flex-1"
-                    placeholder="Nom"
-                  />
-                </div>
-                <div class="flex flex-wrap gap-1">
-                  <button
-                    v-for="e in categoryEmojiOptions"
-                    :key="e"
-                    type="button"
-                    class="btn btn-xs"
-                    :class="{ 'btn-primary': editCategoryForm.emoji === e, 'btn-ghost': editCategoryForm.emoji !== e }"
-                    @click="editCategoryForm.emoji = e"
-                  >{{ e }}</button>
-                </div>
-                <div class="flex gap-1 justify-end">
-                  <button class="btn btn-xs btn-ghost" @click="cancelEditCategory">Annuler</button>
-                  <button
-                    class="btn btn-xs btn-primary"
-                    @click="saveEditCategory"
-                    :disabled="!editCategoryForm.name.trim()"
-                  >Enregistrer</button>
-                </div>
-              </div>
-            </template>
-          </li>
-        </ul>
-
-        <div class="divider">Ajouter une catégorie</div>
-
-        <div class="space-y-2 mb-3">
-          <div class="flex gap-2 items-center">
-            <span class="text-2xl w-10 text-center">{{ newCategory.emoji }}</span>
-            <input
-              type="text"
-              v-model="newCategory.name"
-              class="input input-bordered input-sm flex-1"
-              placeholder="Ex: Frais, Surgelés, Hygiène..."
-              @keyup.enter="addCategory"
-            />
-          </div>
-          <div class="flex flex-wrap gap-1">
-            <button
-              v-for="e in categoryEmojiOptions"
-              :key="e"
-              type="button"
-              class="btn btn-xs"
-              :class="{ 'btn-primary': newCategory.emoji === e, 'btn-ghost': newCategory.emoji !== e }"
-              @click="newCategory.emoji = e"
-            >{{ e }}</button>
-          </div>
-          <button
-            class="btn btn-primary btn-sm w-full"
-            @click="addCategory"
-            :disabled="isAddingCategory || !newCategory.name.trim()"
-          >
-            <span v-if="isAddingCategory" class="loading loading-spinner loading-xs"></span>
-            Ajouter
-          </button>
-        </div>
-
-        <div class="modal-action">
-          <button class="btn btn-ghost" @click="closeCategoriesModal">Fermer</button>
-        </div>
-      </div>
-      <form method="dialog" class="modal-backdrop">
-        <button @click="closeCategoriesModal">close</button>
-      </form>
-    </dialog>
   </main>
 </template>
 
@@ -513,6 +598,7 @@ interface Magasin {
   name: string
   emoji: string
   shoppingCount?: number
+  items?: { id: number; name: string; idealQuantity: number; currentQuantity: number; categoryId: number | null }[]
 }
 
 interface Category {
@@ -530,6 +616,17 @@ interface Boutique {
   categories: Category[]
 }
 
+interface FlatArticle {
+  id: number
+  name: string
+  idealQuantity: number
+  currentQuantity: number
+  categoryId: number | null
+  magasinId: number
+  magasinName: string
+  magasinEmoji: string
+}
+
 const route = useRoute()
 const code = route.params.code as string
 
@@ -544,6 +641,87 @@ const isAdding = ref(false)
 const addError = ref('')
 
 const emojiOptions = ['🛒', '🏪', '🥖', '💊', '🥩', '🧀', '🍷', '🌿', '🔧', '👕', '📚', '🎮']
+
+// Tabs
+const activeTab = ref<'magasins' | 'articles' | 'categories'>('magasins')
+
+// Tab Articles : filtres / tri
+const articlesSearch = ref('')
+const articlesFilterMagasin = ref<number | ''>('')
+const articlesFilterStatus = ref<'' | 'to-buy' | 'ok'>('')
+const articlesSortBy = ref<'name' | 'stock' | 'magasin'>('name')
+const articlesSortDir = ref<'asc' | 'desc'>('asc')
+
+const allItems = computed<FlatArticle[]>(() => {
+  if (!boutique.value?.magasins) return []
+  const out: FlatArticle[] = []
+  for (const m of boutique.value.magasins) {
+    if (!m.items) continue
+    for (const it of m.items) {
+      out.push({
+        id: it.id,
+        name: it.name,
+        idealQuantity: it.idealQuantity,
+        currentQuantity: it.currentQuantity,
+        categoryId: it.categoryId,
+        magasinId: m.id,
+        magasinName: m.name,
+        magasinEmoji: m.emoji
+      })
+    }
+  }
+  return out
+})
+
+const itemsToBuyCount = computed(() =>
+  allItems.value.filter((i: FlatArticle) => i.currentQuantity < i.idealQuantity).length
+)
+
+const filteredArticles = computed(() => {
+  let list = allItems.value
+
+  if (articlesSearch.value.trim()) {
+    const q = articlesSearch.value.toLowerCase()
+    list = list.filter((i: FlatArticle) => i.name.toLowerCase().includes(q))
+  }
+  if (articlesFilterMagasin.value !== '') {
+    list = list.filter((i: FlatArticle) => i.magasinId === articlesFilterMagasin.value)
+  }
+  if (articlesFilterStatus.value === 'to-buy') {
+    list = list.filter((i: FlatArticle) => i.currentQuantity < i.idealQuantity)
+  } else if (articlesFilterStatus.value === 'ok') {
+    list = list.filter((i: FlatArticle) => i.currentQuantity >= i.idealQuantity)
+  }
+
+  list = [...list].sort((a: FlatArticle, b: FlatArticle) => {
+    let cmp = 0
+    if (articlesSortBy.value === 'name') {
+      cmp = a.name.localeCompare(b.name)
+    } else if (articlesSortBy.value === 'stock') {
+      cmp = (a.idealQuantity - a.currentQuantity) - (b.idealQuantity - b.currentQuantity)
+    } else if (articlesSortBy.value === 'magasin') {
+      cmp = a.magasinName.localeCompare(b.magasinName)
+    }
+    return articlesSortDir.value === 'asc' ? cmp : -cmp
+  })
+  return list
+})
+
+function toggleArticlesSort(col: 'name' | 'stock' | 'magasin') {
+  if (articlesSortBy.value === col) {
+    articlesSortDir.value = articlesSortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    articlesSortBy.value = col
+    articlesSortDir.value = 'asc'
+  }
+}
+
+function showArticlesTab(filterStatus: '' | 'to-buy' | 'ok' = '') {
+  activeTab.value = 'articles'
+  articlesFilterStatus.value = filterStatus
+  articlesSearch.value = ''
+  articlesFilterMagasin.value = ''
+}
 
 // Recherche d'articles
 interface SearchResultItem {
@@ -565,8 +743,7 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 const showShoppingModal = ref(false)
 const shoppingForm = ref({ name: '', quantity: 1, magasinId: 0, categoryId: null as number | null })
 
-// Modal catégories
-const showCategoriesModal = ref(false)
+// Catégories CRUD (intégré dans l'onglet)
 const newCategory = ref({ name: '', emoji: '🏷️' })
 const isAddingCategory = ref(false)
 const editingCategoryId = ref<number | null>(null)
@@ -749,17 +926,6 @@ async function onIdealQuantityChange(item: SearchResultItem, event: Event) {
 }
 
 // === Catégories CRUD ===
-function openCategoriesModal() {
-  newCategory.value = { name: '', emoji: '🏷️' }
-  editingCategoryId.value = null
-  showCategoriesModal.value = true
-}
-
-function closeCategoriesModal() {
-  showCategoriesModal.value = false
-  editingCategoryId.value = null
-}
-
 async function addCategory() {
   if (!newCategory.value.name.trim()) return
   isAddingCategory.value = true
