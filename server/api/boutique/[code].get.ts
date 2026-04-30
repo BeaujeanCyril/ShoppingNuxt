@@ -44,8 +44,11 @@ export default defineEventHandler(async (event) => {
   }
 
   // Ajouter le compte d'articles à acheter pour chaque magasin
+  // Un item est "à acheter" s'il manque par rapport à l'objectif de stock OU s'il est demandé ponctuellement
   const magasinsWithCount = boutique.magasins.map(magasin => {
-    const itemsToShop = magasin.items.filter(item => item.currentQuantity < item.idealQuantity)
+    const itemsToShop = magasin.items.filter(item =>
+      item.currentQuantity < item.idealQuantity || item.requestedQuantity > 0
+    )
     return {
       ...magasin,
       itemsCount: magasin.items.length,

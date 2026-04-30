@@ -27,17 +27,28 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Article non trouvé' })
   }
 
+  const entryId = body?.entryId ? parseInt(body.entryId) : null
+
   if (created) {
-    // L'item avait été créé pour la liste : on le supprime
+    // L'item avait été créé pour la liste : on le supprime (cascade ShoppingListEntry).
     await prisma.item.delete({ where: { id: itemId } })
     return { success: true, deleted: true }
   }
 
-  // L'item existait déjà : on remonte currentQuantity (clampé à idealQuantity)
-  const restored = Math.min(item.idealQuantity, item.currentQuantity + quantity)
+  // L'item existait déjà : on décrémente requestedQuantity (clampé à 0).
+  const newRequested = Math.max(0, item.requestedQuantity - quantity)
   const updated = await prisma.item.update({
     where: { id: itemId },
-    data: { currentQuantity: restored }
+    data: { requestedQuantity: newRequested }
   })
+
+  // Marque l'entrée d'historique correspondante comme annulée pour ne pas biaiser l'analyse
+  if (entryId) {
+    await prisma.shoppingListEntry.updateMany({
+      where: { id: entryId, itemId },
+      data: { revertedAt: new Date() }
+    })
+  }
+
   return { success: true, deleted: false, item: updated }
 })

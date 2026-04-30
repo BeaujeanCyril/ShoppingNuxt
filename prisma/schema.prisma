@@ -56,16 +56,33 @@ model Magasin {
 
 // Item - appartient à un magasin avec quantité idéale et actuelle
 model Item {
-  id              Int       @id @default(autoincrement())
-  name            String
-  idealQuantity   Int       @default(1)
-  currentQuantity Int       @default(0)
-  magasinId       Int
-  magasin         Magasin   @relation(fields: [magasinId], references: [id], onDelete: Cascade)
-  categoryId      Int?
-  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                     Int       @id @default(autoincrement())
+  name                   String
+  idealQuantity          Int       @default(1)   // objectif de stock à long terme (0 = pas d'objectif)
+  currentQuantity        Int       @default(0)   // stock actuel
+  requestedQuantity      Int       @default(0)   // demandé ponctuellement via la liste de course (one-shot)
+  dismissedQiSuggestion  Int?                    // mémorise une valeur de suggestion QI rejetée
+  magasinId              Int
+  magasin                Magasin   @relation(fields: [magasinId], references: [id], onDelete: Cascade)
+  categoryId             Int?
+  category               Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
+  shoppingEntries ShoppingListEntry[]
+
+  @@schema("shopping")
+}
+
+// Trace chaque ajout à la liste de course pour analyser les patterns d'achat
+model ShoppingListEntry {
+  id         Int       @id @default(autoincrement())
+  itemId     Int
+  item       Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity   Int
+  revertedAt DateTime?                            // si l'utilisateur a annulé l'ajout
+  createdAt  DateTime  @default(now())
+
+  @@index([itemId, createdAt])
   @@schema("shopping")
 }

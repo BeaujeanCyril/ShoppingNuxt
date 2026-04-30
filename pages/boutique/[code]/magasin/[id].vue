@@ -68,6 +68,9 @@
                   <h3 class="font-semibold">{{ item.name }}</h3>
                   <p class="text-sm opacity-70">
                     Idéal: {{ item.idealQuantity }}
+                    <span v-if="item.requestedQuantity > 0" class="badge badge-info badge-xs ml-1" title="Demandé via liste de course">
+                      +{{ item.requestedQuantity }}
+                    </span>
                     <span v-if="item.category" class="badge badge-sm badge-outline ml-2">
                       {{ item.category.emoji }} {{ item.category.name }}
                     </span>
@@ -151,8 +154,11 @@
                   <p class="text-sm">
                     <span class="text-error font-bold">{{ item.currentQuantity }}</span>
                     / {{ item.idealQuantity }}
-                    <span class="opacity-70">
-                      (manque {{ item.idealQuantity - item.currentQuantity }})
+                    <span v-if="item.requestedQuantity > 0" class="badge badge-info badge-xs ml-1" title="Demandé via liste de course">
+                      +{{ item.requestedQuantity }}
+                    </span>
+                    <span class="opacity-70 ml-1">
+                      (à acheter {{ itemToBuy(item) }})
                     </span>
                     <span v-if="item.category" class="badge badge-sm badge-outline ml-2">
                       {{ item.category.emoji }} {{ item.category.name }}
@@ -162,7 +168,7 @@
 
                 <!-- Badge quantité -->
                 <span class="badge badge-warning badge-lg">
-                  {{ item.idealQuantity - item.currentQuantity }}
+                  {{ itemToBuy(item) }}
                 </span>
               </div>
             </div>
@@ -276,8 +282,13 @@ interface Item {
   name: string
   idealQuantity: number
   currentQuantity: number
+  requestedQuantity: number
   categoryId?: number | null
   category?: Category | null
+}
+
+function itemToBuy(i: Item): number {
+  return Math.max(i.idealQuantity - i.currentQuantity, 0) + (i.requestedQuantity || 0)
 }
 
 interface Magasin {
@@ -307,7 +318,7 @@ const formError = ref('')
 
 // Computed
 const shoppingList = computed(() => {
-  return items.value.filter(item => item.currentQuantity < item.idealQuantity)
+  return items.value.filter((item: Item) => itemToBuy(item) > 0)
 })
 
 // Methods

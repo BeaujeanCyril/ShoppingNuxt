@@ -54,14 +54,19 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Remettre la quantité au niveau spécifié ou au niveau idéal
+  // Remettre la quantité : si fournie, on la prend telle quelle ;
+  // sinon on couvre à la fois l'objectif de stock et la demande ponctuelle.
+  // À chaque restock, requestedQuantity est remis à 0 (la liste est consommée).
   const newQuantity = quantity !== undefined
     ? Math.max(0, quantity)
-    : existingItem.idealQuantity
+    : Math.max(existingItem.idealQuantity, existingItem.currentQuantity + existingItem.requestedQuantity)
 
   const item = await prisma.item.update({
     where: { id: itemId },
-    data: { currentQuantity: newQuantity }
+    data: {
+      currentQuantity: newQuantity,
+      requestedQuantity: 0
+    }
   })
 
   return item

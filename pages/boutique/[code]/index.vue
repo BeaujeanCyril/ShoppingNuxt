@@ -77,11 +77,14 @@
                   <div class="text-sm opacity-70 mt-1">
                     <span>{{ item.magasin.emoji }} {{ item.magasin.name }}</span>
                     <span class="mx-2">•</span>
-                    <span :class="item.currentQuantity < item.idealQuantity ? 'text-warning font-semibold' : 'text-success'">
+                    <span :class="toBuyQty(item) > 0 ? 'text-warning font-semibold' : 'text-success'">
                       Stock {{ item.currentQuantity }} / {{ item.idealQuantity }}
                     </span>
-                    <span v-if="item.currentQuantity < item.idealQuantity" class="opacity-80">
-                      (manque {{ item.idealQuantity - item.currentQuantity }})
+                    <span v-if="item.requestedQuantity > 0" class="badge badge-info badge-xs ml-1" title="Demandé via liste de course">
+                      +{{ item.requestedQuantity }}
+                    </span>
+                    <span v-if="toBuyQty(item) > 0" class="opacity-80 ml-1">
+                      (à acheter {{ toBuyQty(item) }})
                     </span>
                   </div>
                 </div>
@@ -119,6 +122,50 @@
       </section>
 
       <template v-else>
+        <!-- Suggestions QI -->
+        <section v-if="qiSuggestions.length" class="card bg-info/10 border border-info/30 shadow mb-6">
+          <div class="card-body py-3">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <h2 class="card-title text-base">
+                💡 Suggestions
+                <span class="badge badge-info badge-sm">{{ qiSuggestions.length }}</span>
+              </h2>
+              <button class="btn btn-ghost btn-xs" @click="showSuggestions = !showSuggestions">
+                {{ showSuggestions ? 'Masquer' : 'Afficher' }}
+              </button>
+            </div>
+            <ul v-if="showSuggestions" class="space-y-2 mt-2">
+              <li
+                v-for="s in qiSuggestions"
+                :key="s.itemId"
+                class="bg-base-100 rounded p-2 text-sm"
+              >
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <span>
+                    <span class="font-medium">{{ s.itemName }}</span>
+                    <span class="opacity-60 text-xs ml-1">({{ s.magasinEmoji }} {{ s.magasinName }})</span>
+                    <span class="block opacity-80 text-xs mt-1">
+                      <template v-if="s.reason === 'create'">
+                        Ajouté {{ s.sampleSize }} fois en 3 mois — quantité médiane : <span class="font-bold">{{ s.suggestedIdeal }}</span>. Définir une QI ?
+                      </template>
+                      <template v-else>
+                        QI actuelle : {{ s.currentIdeal }}, mais l'usage suggère plutôt <span class="font-bold">{{ s.suggestedIdeal }}</span> ({{ s.sampleSize }} ajouts en 3 mois)
+                      </template>
+                    </span>
+                  </span>
+                  <div class="flex gap-1">
+                    <button
+                      class="btn btn-success btn-xs"
+                      @click="acceptQiSuggestion(s)"
+                    >Accepter (QI = {{ s.suggestedIdeal }})</button>
+                    <button class="btn btn-ghost btn-xs" @click="dismissQiSuggestion(s)">Ignorer</button>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </section>
+
         <!-- Hero CTA : liste de courses -->
         <section
           class="card shadow-xl mb-6"
@@ -273,6 +320,9 @@
                         {{ item.currentQuantity }}
                       </span>
                       <span class="opacity-50"> / {{ item.idealQuantity }}</span>
+                      <span v-if="item.requestedQuantity > 0" class="badge badge-info badge-xs ml-1" title="Demandé via liste de course">
+                        +{{ item.requestedQuantity }}
+                      </span>
                     </td>
                     <td>
                       <NuxtLink :to="`/boutique/${code}/magasin/${item.magasinId}`" class="link link-hover">
@@ -280,8 +330,8 @@
                       </NuxtLink>
                     </td>
                     <td>
-                      <span v-if="item.currentQuantity < item.idealQuantity" class="badge badge-warning badge-sm">
-                        À acheter ({{ item.idealQuantity - item.currentQuantity }})
+                      <span v-if="toBuyQty(item) > 0" class="badge badge-warning badge-sm">
+                        À acheter ({{ toBuyQty(item) }})
                       </span>
                       <span v-else class="badge badge-success badge-sm">OK</span>
                     </td>
@@ -598,7 +648,7 @@ interface Magasin {
   name: string
   emoji: string
   shoppingCount?: number
-  items?: { id: number; name: string; idealQuantity: number; currentQuantity: number; categoryId: number | null }[]
+  items?: { id: number; name: string; idealQuantity: number; currentQuantity: number; requestedQuantity: number; categoryId: number | null }[]
 }
 
 interface Category {
@@ -621,10 +671,27 @@ interface FlatArticle {
   name: string
   idealQuantity: number
   currentQuantity: number
+  requestedQuantity: number
   categoryId: number | null
   magasinId: number
   magasinName: string
   magasinEmoji: string
+}
+
+interface QiSuggestion {
+  itemId: number
+  itemName: string
+  magasinId: number
+  magasinName: string
+  magasinEmoji: string
+  currentIdeal: number
+  suggestedIdeal: number
+  sampleSize: number
+  reason: 'create' | 'adjust'
+}
+
+function toBuyQty(item: { idealQuantity: number; currentQuantity: number; requestedQuantity: number }): number {
+  return Math.max(item.idealQuantity - item.currentQuantity, 0) + item.requestedQuantity
 }
 
 const route = useRoute()
@@ -645,6 +712,43 @@ const emojiOptions = ['🛒', '🏪', '🥖', '💊', '🥩', '🧀', '🍷', '�
 // Tabs
 const activeTab = ref<'magasins' | 'articles' | 'categories'>('magasins')
 
+// Suggestions QI
+const qiSuggestions = ref<QiSuggestion[]>([])
+const showSuggestions = ref(true)
+
+async function loadQiSuggestions() {
+  try {
+    qiSuggestions.value = await $fetch(`/api/boutique/${code}/qi-suggestions`) as QiSuggestion[]
+  } catch {
+    qiSuggestions.value = []
+  }
+}
+
+async function acceptQiSuggestion(s: QiSuggestion) {
+  try {
+    await $fetch(`/api/boutique/${code}/items/${s.itemId}/qi-suggestion`, {
+      method: 'POST',
+      body: { action: 'accept', value: s.suggestedIdeal }
+    })
+    qiSuggestions.value = qiSuggestions.value.filter((x: QiSuggestion) => x.itemId !== s.itemId)
+    loadBoutique()
+  } catch (e: any) {
+    alert(e.data?.message || 'Erreur')
+  }
+}
+
+async function dismissQiSuggestion(s: QiSuggestion) {
+  try {
+    await $fetch(`/api/boutique/${code}/items/${s.itemId}/qi-suggestion`, {
+      method: 'POST',
+      body: { action: 'dismiss', value: s.suggestedIdeal }
+    })
+    qiSuggestions.value = qiSuggestions.value.filter((x: QiSuggestion) => x.itemId !== s.itemId)
+  } catch (e: any) {
+    alert(e.data?.message || 'Erreur')
+  }
+}
+
 // Tab Articles : filtres / tri
 const articlesSearch = ref('')
 const articlesFilterMagasin = ref<number | ''>('')
@@ -663,6 +767,7 @@ const allItems = computed<FlatArticle[]>(() => {
         name: it.name,
         idealQuantity: it.idealQuantity,
         currentQuantity: it.currentQuantity,
+        requestedQuantity: it.requestedQuantity ?? 0,
         categoryId: it.categoryId,
         magasinId: m.id,
         magasinName: m.name,
@@ -674,7 +779,7 @@ const allItems = computed<FlatArticle[]>(() => {
 })
 
 const itemsToBuyCount = computed(() =>
-  allItems.value.filter((i: FlatArticle) => i.currentQuantity < i.idealQuantity).length
+  allItems.value.filter((i: FlatArticle) => toBuyQty(i) > 0).length
 )
 
 const filteredArticles = computed(() => {
@@ -688,9 +793,9 @@ const filteredArticles = computed(() => {
     list = list.filter((i: FlatArticle) => i.magasinId === articlesFilterMagasin.value)
   }
   if (articlesFilterStatus.value === 'to-buy') {
-    list = list.filter((i: FlatArticle) => i.currentQuantity < i.idealQuantity)
+    list = list.filter((i: FlatArticle) => toBuyQty(i) > 0)
   } else if (articlesFilterStatus.value === 'ok') {
-    list = list.filter((i: FlatArticle) => i.currentQuantity >= i.idealQuantity)
+    list = list.filter((i: FlatArticle) => toBuyQty(i) === 0)
   }
 
   list = [...list].sort((a: FlatArticle, b: FlatArticle) => {
@@ -729,6 +834,7 @@ interface SearchResultItem {
   name: string
   idealQuantity: number
   currentQuantity: number
+  requestedQuantity: number
   magasinId: number
   categoryId: number | null
   magasin: { id: number; name: string; emoji: string }
@@ -757,6 +863,7 @@ interface ShoppingEntry {
   quantity: number
   created: boolean
   categoryId?: number | null
+  entryId?: number | null
 }
 const shoppingAdded = ref<ShoppingEntry[]>([])
 const editingShoppingIndex = ref<number | null>(null)
@@ -1059,7 +1166,7 @@ async function saveEditShoppingEntry() {
     // Revert l'action initiale
     await $fetch(`/api/boutique/${code}/shopping-list/revert`, {
       method: 'POST',
-      body: { itemId: entry.itemId, quantity: entry.quantity, created: entry.created }
+      body: { itemId: entry.itemId, quantity: entry.quantity, created: entry.created, entryId: entry.entryId ?? null }
     })
     // Re-applique avec les nouvelles valeurs
     const res = await $fetch(`/api/boutique/${code}/shopping-list/add`, {
@@ -1070,7 +1177,7 @@ async function saveEditShoppingEntry() {
         quantity: newQuantity,
         categoryId: editShoppingForm.value.categoryId
       }
-    }) as { item: { id: number; name: string; magasinId: number; categoryId: number | null }; created: boolean }
+    }) as { item: { id: number; name: string; magasinId: number; categoryId: number | null }; created: boolean; entryId: number }
 
     shoppingAdded.value[idx] = {
       itemId: res.item.id,
@@ -1078,7 +1185,8 @@ async function saveEditShoppingEntry() {
       name: res.item.name,
       quantity: newQuantity,
       created: res.created,
-      categoryId: res.item.categoryId
+      categoryId: res.item.categoryId,
+      entryId: res.entryId
     }
     editingShoppingIndex.value = null
   } catch (e: any) {
@@ -1096,7 +1204,7 @@ async function deleteShoppingEntry(index: number) {
   try {
     await $fetch(`/api/boutique/${code}/shopping-list/revert`, {
       method: 'POST',
-      body: { itemId: entry.itemId, quantity: entry.quantity, created: entry.created }
+      body: { itemId: entry.itemId, quantity: entry.quantity, created: entry.created, entryId: entry.entryId ?? null }
     })
     shoppingAdded.value.splice(index, 1)
     if (editingShoppingIndex.value === index) editingShoppingIndex.value = null
@@ -1124,14 +1232,15 @@ async function addToShoppingList() {
           categoryId: shoppingForm.value.categoryId
         }
       }
-    ) as { item: { id: number; name: string; magasinId: number; categoryId: number | null }; created: boolean }
+    ) as { item: { id: number; name: string; magasinId: number; categoryId: number | null }; created: boolean; entryId: number }
     shoppingAdded.value.unshift({
       itemId: res.item.id,
       magasinId: res.item.magasinId,
       name: res.item.name,
       quantity: shoppingForm.value.quantity,
       created: res.created,
-      categoryId: res.item.categoryId
+      categoryId: res.item.categoryId,
+      entryId: res.entryId
     })
     shoppingForm.value.name = ''
     shoppingForm.value.quantity = 1
@@ -1145,7 +1254,8 @@ async function addToShoppingList() {
   }
 }
 
-onMounted(() => {
-  loadBoutique()
+onMounted(async () => {
+  await loadBoutique()
+  loadQiSuggestions()
 })
 </script>

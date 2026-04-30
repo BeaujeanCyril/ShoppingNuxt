@@ -42,29 +42,34 @@ export default defineEventHandler(async (event) => {
   })
 
   if (existing) {
-    // Diminue currentQuantity pour faire apparaître l'item dans la liste de courses,
-    // sans modifier idealQuantity. Clamp à 0.
-    const newCurrent = Math.max(0, existing.currentQuantity - quantity)
+    // Item existant : on incrémente requestedQuantity (sans toucher à idealQuantity ni à currentQuantity).
     const updated = await prisma.item.update({
       where: { id: existing.id },
       data: {
-        currentQuantity: newCurrent,
+        requestedQuantity: existing.requestedQuantity + quantity,
         // Si on fournit une catégorie et que l'item n'en a pas, on la pose
         ...(categoryId && !existing.categoryId ? { categoryId } : {})
       }
     })
-    return { item: updated, created: false }
+    const entry = await prisma.shoppingListEntry.create({
+      data: { itemId: existing.id, quantity }
+    })
+    return { item: updated, created: false, entryId: entry.id }
   }
 
-  // Création : ideal = quantity demandée, current = 0 → apparaît à acheter
+  // Création : pas de QI (idealQuantity=0), seulement un besoin ponctuel
   const created = await prisma.item.create({
     data: {
       name,
-      idealQuantity: quantity,
+      idealQuantity: 0,
       currentQuantity: 0,
+      requestedQuantity: quantity,
       magasinId,
       categoryId
     }
   })
-  return { item: created, created: true }
+  const entry = await prisma.shoppingListEntry.create({
+    data: { itemId: created.id, quantity }
+  })
+  return { item: created, created: true, entryId: entry.id }
 })
